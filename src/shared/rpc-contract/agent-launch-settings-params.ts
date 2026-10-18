@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isTuiAgent } from '../tui-agent-config'
+import { AgentProfileDescriptor, AgentLaunchTargetSchema } from '../agent-launch-profile'
 import type { TuiAgent } from '../tui-agent'
 
 const Agent = z.custom<TuiAgent>((value) => typeof value === 'string' && isTuiAgent(value))
@@ -26,5 +27,20 @@ export const AgentLaunchSettingsMutation = z.discriminatedUnion('type', [
   z.object({ type: z.literal('command'), agent: Agent, value: Value }).strict(),
   z.object({ type: z.literal('arguments'), agent: Agent, value: Value }).strict(),
   z.object({ type: z.literal('environment-set'), agent: Agent, name: Name, value: Value }).strict(),
-  z.object({ type: z.literal('environment-remove'), agent: Agent, name: Name }).strict()
+  z.object({ type: z.literal('environment-remove'), agent: Agent, name: Name }).strict(),
+  z.object({ type: z.literal('profile-create'), profile: AgentProfileDescriptor }).strict(),
+  z
+    .object({
+      type: z.literal('profile-update'),
+      id: z.string().min(1).max(128),
+      patch: z.record(z.string(), z.unknown())
+    })
+    .strict(),
+  z.object({ type: z.literal('profile-remove'), id: z.string().min(1).max(128) }).strict(),
+  z
+    .object({
+      type: z.literal('profile-default'),
+      target: z.union([AgentLaunchTargetSchema, z.literal('blank'), z.null()])
+    })
+    .strict()
 ])

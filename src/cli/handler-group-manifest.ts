@@ -212,6 +212,16 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/agent-launch.js')).AGENT_LAUNCH_HANDLERS
   },
   {
+    name: 'agent-profile',
+    keys: [
+      'agent profile list',
+      'agent profile show',
+      'agent profile create',
+      'agent profile remove'
+    ],
+    load: async () => (await import('./handlers/agent-profile.js')).AGENT_PROFILE_HANDLERS
+  },
+  {
     name: 'profile-state',
     keys: ['profile state exports', 'profile state rollback'],
     load: async () => (await import('./handlers/profile-state.js')).PROFILE_STATE_HANDLERS

@@ -1,6 +1,6 @@
 import type { GlobalSettings } from './global-settings-types'
 import type { TuiAgent } from './tui-agent'
-import type { AgentLaunchTarget, AgentProfileDescriptor } from './agent-launch-profile'
+import { AgentProfileDescriptor, type AgentLaunchTarget } from './agent-launch-profile'
 import { buildDefaultAgentSettingsUpdate } from './default-agent-settings'
 import {
   buildAgentAvailabilitySettingsUpdate,
@@ -47,6 +47,10 @@ export type AgentLaunchSettingsMutation =
   | { type: 'arguments'; agent: TuiAgent; value: string }
   | { type: 'environment-set'; agent: TuiAgent; name: string; value: string }
   | { type: 'environment-remove'; agent: TuiAgent; name: string }
+  | { type: 'profile-create'; profile: AgentProfileDescriptor }
+  | { type: 'profile-update'; id: string; patch: Partial<AgentProfileDescriptor> }
+  | { type: 'profile-remove'; id: string }
+  | { type: 'profile-default'; target: AgentLaunchTarget | 'blank' | null }
 
 export function projectAgentLaunchSettings(
   settings: AgentLaunchSettingsSource
@@ -120,5 +124,44 @@ export function agentLaunchSettingsMutationUpdates(
         mutation.type === 'environment-set' ? { ...env, [mutation.name]: mutation.value } : env
       return { agentDefaultEnv: { ...settings.agentDefaultEnv, [mutation.agent]: nextEnv } }
     }
+    case 'profile-create': {
+      const parsed = AgentProfileDescriptor.safeParse(mutation.profile)
+      if (!parsed.success) {
+        throw new Error(`Invalid profile: ${parsed.error.issues[0]?.message ?? 'unknown'}`)
+      }
+      return { agentProfiles: { ...settings.agentProfiles, [parsed.data.id]: parsed.data } }
+    }
+    case 'profile-update': {
+      const existing = settings.agentProfiles?.[mutation.id]
+      if (!existing) {
+        throw new Error(`Unknown profile: ${mutation.id}`)
+      }
+      const parsed = AgentProfileDescriptor.safeParse({
+        ...existing,
+        ...mutation.patch,
+        id: mutation.id
+      })
+      if (!parsed.success) {
+        throw new Error(`Invalid profile: ${parsed.error.issues[0]?.message ?? 'unknown'}`)
+      }
+      return { agentProfiles: { ...settings.agentProfiles, [mutation.id]: parsed.data } }
+    }
+    case 'profile-remove': {
+      const next = { ...settings.agentProfiles }
+      delete next[mutation.id]
+      const current: AgentLaunchTarget | 'blank' | null | undefined = settings.defaultAgentTarget
+      const clearingDefault =
+        current !== undefined &&
+        current !== null &&
+        current !== 'blank' &&
+        current.kind === 'profile' &&
+        current.profileId === mutation.id
+      return {
+        agentProfiles: next,
+        ...(clearingDefault ? { defaultAgentTarget: null } : {})
+      }
+    }
+    case 'profile-default':
+      return { defaultAgentTarget: mutation.target }
   }
 }

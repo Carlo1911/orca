@@ -111,6 +111,14 @@ export type AgentLaunchTarget =
   | { kind: 'builtin'; agent: TuiAgent }
   | { kind: 'profile'; profileId: AgentProfileId }
 
+export const AgentLaunchTargetSchema: z.ZodType<AgentLaunchTarget> = z.union([
+  z.strictObject({
+    kind: z.literal('builtin'),
+    agent: z.string().refine((value) => isTuiAgent(value), 'Unknown agent')
+  }),
+  z.strictObject({ kind: z.literal('profile'), profileId: AgentProfileId })
+])
+
 export function isAgentLaunchTarget(value: unknown): value is AgentLaunchTarget {
   if (typeof value !== 'object' || value === null) {
     return false

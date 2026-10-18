@@ -19,6 +19,7 @@ import { AgentDetectionCatalog } from './AgentDetectionCatalog'
 import type { AgentCatalogRowProps } from './AgentCatalogRow'
 import { HostAgentEnvironmentEditor } from './HostAgentEnvironmentEditor'
 import { buildCodexSessionSourceHomeControl } from './codex-session-source-home-control'
+import { AgentProfileSection } from './AgentProfileSection'
 import { translate } from '@/i18n/i18n'
 
 export type AgentPermissionsRenderer = (
@@ -126,6 +127,7 @@ export function AgentLaunchSettingsCatalog({
         onSetDefault={(agent) => save({ type: 'default', agent })}
       />
       {renderPermissions(settings.permissionMode, (mode) => save({ type: 'permissions', mode }))}
+      <AgentProfileSection settings={settings} mutate={mutate} />
       <AgentDetectionCatalog
         detectedAgents={detectedAgents}
         undetectedAgents={undetectedAgents}

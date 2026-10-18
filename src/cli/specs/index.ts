@@ -11,6 +11,7 @@ import { COMPUTER_COMMAND_SPECS } from './computer'
 import { ENVIRONMENT_COMMAND_SPECS } from './environment'
 import { MANAGED_SERVER_COMMAND_SPECS } from './managed-server'
 import { AGENT_HOOK_COMMAND_SPECS } from './agent-hooks'
+import { AGENT_PROFILE_COMMAND_SPECS } from './agent-profile'
 import { AGENT_LAUNCH_COMMAND_SPECS } from './agent-launch'
 import { DIAGNOSTICS_COMMAND_SPECS } from './diagnostics'
 import { TERMINAL_DAEMON_COMMAND_SPECS } from './terminal-daemon'
@@ -38,6 +39,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...ORCHESTRATION_COMMAND_SPECS,
   ...COMPUTER_COMMAND_SPECS,
   ...AGENT_HOOK_COMMAND_SPECS,
+  ...AGENT_PROFILE_COMMAND_SPECS,
   ...AGENT_LAUNCH_COMMAND_SPECS,
   ...DIAGNOSTICS_COMMAND_SPECS,
   ...TERMINAL_DAEMON_COMMAND_SPECS,

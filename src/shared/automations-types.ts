@@ -1,4 +1,5 @@
 import type { TuiAgent } from './tui-agent'
+import type { AgentProfileId } from './agent-launch-profile'
 import type { SetupDecision } from './worktree/create-types'
 import type { TaskSourceContext, WorkspaceRunContext } from './task-source-context'
 
@@ -96,6 +97,8 @@ export type Automation = {
   prompt: string
   precheck: AutomationPrecheck | null
   agentId: TuiAgent
+  /** Profile target; when set, the run resolves the profile instead of `agentId`. */
+  profileId?: AgentProfileId
   /** Saved text appended to the host's default agent Arguments on each fresh run; absent means none. */
   extraAgentArgs?: string
   /** Why: runContext carries the logical project + host setup identity for
@@ -185,6 +188,7 @@ export type AutomationCreateInput = {
   prompt: string
   precheck?: AutomationPrecheck | null
   agentId: TuiAgent
+  profileId?: AgentProfileId
   /** Empty or whitespace means no extras. */
   extraAgentArgs?: string
   runContext?: WorkspaceRunContext | null
@@ -211,6 +215,7 @@ export type AutomationUpdateInput = Partial<
     | 'prompt'
     | 'precheck'
     | 'agentId'
+    | 'profileId'
     | 'extraAgentArgs'
     | 'runContext'
     | 'sourceContext'

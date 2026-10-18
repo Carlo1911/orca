@@ -1,4 +1,5 @@
 import type { GlobalSettingsBase } from './global-settings-base'
+import type { AgentLaunchTarget, AgentProfileDescriptor } from './agent-launch-profile'
 import type { ExecutionHostId } from './execution-host'
 import type { OrcaWorkspaceLayout } from './orca-workspace-layout'
 import type { GitHubProjectSettings } from './github/project-types'
@@ -415,6 +416,10 @@ export type GlobalSettings = GlobalSettingsBase & {
   agentDefaultArgs?: Partial<Record<TuiAgent, string>>
   /** Per-agent launch environment defaults used when yolo mode is exposed as env. */
   agentDefaultEnv?: Partial<Record<TuiAgent, Record<string, string>>>
+  /** Custom agent profiles owned by this host; keyed by stable profile id. */
+  agentProfiles?: Record<string, AgentProfileDescriptor>
+  /** Default launch target: a built-in agent, blank, or a profile reference. */
+  defaultAgentTarget?: AgentLaunchTarget | 'blank' | null
   /** One-shot guard for adding yolo-mode default args to untouched agent launch profiles. */
   agentYoloDefaultsMigrated?: boolean
   /** Why: disabling must persist so startup doesn't reinstall global agent hook entries the user just removed. */

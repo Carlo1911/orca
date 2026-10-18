@@ -1,6 +1,7 @@
 import type { GlobalSettings } from './global-settings-types'
 import type { SessionOptionValue } from './native-chat-session-options'
 import type { TuiAgent } from './tui-agent'
+import type { AgentProfileId } from './agent-launch-profile'
 import { resolveTuiAgentLaunchArgs, resolveTuiAgentLaunchEnv } from './tui-agent-launch-defaults'
 import { resolveStartupShell, type AgentStartupShell } from './tui-agent-startup-shell'
 import { hasExtraAgentArgs, mergeExtraAgentArgs } from './automation-extra-agent-args'
@@ -17,6 +18,8 @@ export type AgentStartupSettings = Partial<
 /** Exactly the `buildAgentStartupPlan` / `buildAgentDraftLaunchPlan` inputs that settings decide. */
 export type AgentStartupPlanInputs = {
   agent: TuiAgent
+  /** Profile reference when the launch targets one; resolution happens before planning. */
+  profileId?: AgentProfileId
   cmdOverrides: Partial<Record<TuiAgent, string>>
   agentArgs: string | null
   agentEnv: Record<string, string>

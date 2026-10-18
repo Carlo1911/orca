@@ -45,6 +45,8 @@ const tolerantTabLayoutId = z
 
 export const AgentLaunchFields = z.object({
   agent: LaunchAgent,
+  /** Profile target. Ignored by hosts without the profiles capability (U4 rejects pre-effects). */
+  profileId: z.string().min(1).max(128).optional(),
   /**
    * Names this launch so a retry replays instead of starting a second agent.
    *

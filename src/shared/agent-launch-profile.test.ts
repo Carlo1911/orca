@@ -40,7 +40,7 @@ describe('agent-launch-profile', () => {
       id: 'my-cli',
       baseProvider: null,
       command: '/usr/local/bin/agent',
-      promptPolicy: 'stdin'
+      promptPolicy: 'stdin-after-start'
     })
     expect(generic.baseProvider).toBeNull()
   })

@@ -7,8 +7,8 @@ import type { AgentLaunchIntent, AgentLaunchTarget } from '../../../../shared/ag
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { assertOpenCodeModelLaunchPreferencesAbsent } from '../../../opencode/opencode-model-startup-plan'
 import type { AgentLaunchParams } from '../../../../shared/rpc-contract/agent-launch-params'
+import { resolveProfileForLaunch } from './agent-launch-profile-resolution'
 import type { EarlyAgentLaunchTab } from './agent-launch-tab-publication'
-
 /**
  * A client addresses a workspace by selector, but the result's `worktreeId` is an id and every
  * step below the executor re-prefixes it as `id:<worktreeId>`. Resolving here is what keeps a
@@ -91,6 +91,29 @@ export async function resolveUnlaunchedIntent(
   runtime: OrcaRuntimeService,
   early: EarlyAgentLaunchTab | null
 ): Promise<AgentLaunchIntent> {
+  if (params.profileId) {
+    // KTD2/KTD6: resolve before any effect. The runtime owns definitions;
+    // a paired projection never substitutes for the host store.
+    const definitions = runtime.getClientAgentLaunchSettings().agentProfiles
+    const resolved = resolveProfileForLaunch(params.profileId, {
+      lookup: (id) => {
+        const descriptor = (definitions as Record<string, unknown>)[id]
+        if (!descriptor || typeof descriptor !== 'object') {
+          return null
+        }
+        // Descriptors carry no secrets; the sealed payload materializes at spawn.
+        return { profile: descriptor as never, available: true }
+      },
+      definitions: new Map(),
+      materialize: () => ({ ok: true })
+    })
+    if (!resolved.ok) {
+      throw new Error(resolved.code)
+    }
+    const intent = await agentLaunchIntent(params, runtime, early?.paneKey)
+    await validateReusedTerminal(intent, runtime)
+    return { ...intent, profileRecipe: resolved.recipe }
+  }
   if (params.reuseTerminal || params.target.kind === 'create-worktree') {
     assertOpenCodeModelLaunchPreferencesAbsent(params.agent, params.sessionOptions)
   }

@@ -56,7 +56,7 @@ describe('resolveAgentLaunchTarget', () => {
   })
 
   it('resolves a generic profile without catalog permissions', () => {
-    const generic = profile({ id: 'g1', baseProvider: null, promptPolicy: 'stdin' })
+    const generic = profile({ id: 'g1', baseProvider: null, promptPolicy: 'stdin-after-start' })
     const result = resolveAgentLaunchTarget({ kind: 'profile', profileId: 'g1' }, () => ({
       profile: generic,
       available: true

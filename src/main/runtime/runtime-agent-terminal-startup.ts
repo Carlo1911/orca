@@ -21,6 +21,7 @@ import {
 } from './agent-launch-typed-line-shell'
 import { resolveTerminalStartupCwd } from '../../shared/terminal-startup-cwd'
 import { resolveAgentStartupPlanInputs } from '../../shared/agent-startup-plan-inputs'
+import { buildGenericAgentStartupPlan } from '../../shared/generic-agent-startup'
 import { agentStartedTelemetry } from '../agent-launch/agent-started-telemetry'
 import { terminalShellOverrideRefusal } from './terminal-shell-override-host-support'
 import {
@@ -110,6 +111,39 @@ export async function resolveAgentTerminalCreateOptions(
     }
     if (!isTuiAgentEnabled(opts.startupAgent, store.getSettings().disabledTuiAgents)) {
       throw new Error(`Agent ${opts.startupAgent} is disabled. Choose an enabled agent.`)
+    }
+  }
+  // KTD8: a fixed generic recipe bypasses the built-in catalog entirely. The
+  // command runs verbatim; env rides from the sealed recipe, not settings.
+  if (opts.startupProfile && !opts.startupAgent) {
+    if (callerSuppliedLaunch || opts.command || opts.resumeProviderSession) {
+      throw new Error('startupProfile cannot combine with a caller-supplied launch.')
+    }
+    if (!store) {
+      throw new Error('runtime_unavailable')
+    }
+    const recipe = opts.startupProfile
+    const plan = buildGenericAgentStartupPlan({
+      profile: {
+        command: recipe.command,
+        args: recipe.args,
+        envSet: { ...recipe.envSet },
+        promptPolicy: recipe.promptPolicy
+      },
+      prompt: opts.startupPrompt ?? '',
+      platform: agentLaunchPlatformForScope(store, workspace)
+    })
+    if (!plan) {
+      throw new AgentLaunchUnbuildableError('Could not build launch command for profile.')
+    }
+    const env = opts.accountEnv ? { ...plan.env, ...opts.accountEnv } : plan.env
+    return {
+      ...opts,
+      command: plan.launchCommand,
+      ...(env ? { env } : {}),
+      ...(recipe.promptPolicy === 'stdin-after-start' && plan.followupPrompt
+        ? { startupPrompt: plan.followupPrompt }
+        : {})
     }
   }
   if (!launchAgent || !store) {

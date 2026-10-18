@@ -330,6 +330,7 @@ async function createTerminalSurface(
   const terminal = await surfaces.createTerminalAgent({
     worktreeId: workspace.worktreeId,
     agent: intent.agent,
+    ...(intent.profileRecipe ? { startupProfile: intent.profileRecipe } : {}),
     ...(startupPrompt ? { startupPrompt } : {}),
     ...terminalLaunchInputs(intent),
     viewMode: 'terminal'

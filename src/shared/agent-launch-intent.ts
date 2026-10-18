@@ -102,6 +102,18 @@ export type AgentLaunchIntent = {
   accountEnv?: Readonly<Record<string, string>>
   /** `agent.launch`'s `nativeChatDefault`: the caller's chat default in place of the host's own. */
   nativeChatDefault?: boolean
+  /** Profile recipe fixed at admission (KTD3). The executor runs this, never the mutable definition. */
+  profileRecipe?: {
+    readonly profileId: string
+    readonly revisionId: string
+    readonly baseProvider: string | null
+    readonly command: string
+    readonly args: string
+    readonly envSet: Readonly<Record<string, string>>
+    readonly envUnset: readonly string[]
+    readonly promptPolicy: 'argv' | 'flag' | 'stdin-after-start'
+    readonly promptFlag?: string
+  }
 }
 
 /**

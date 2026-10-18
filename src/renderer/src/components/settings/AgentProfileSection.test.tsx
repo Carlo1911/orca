@@ -60,7 +60,7 @@ describe('AgentProfileSection', () => {
           revisionId: 'rev-1',
           command: 'claude',
           args: '',
-          envSet: {},
+          envNames: [],
           envUnset: [],
           promptPolicy: 'argv'
         }

@@ -3,8 +3,10 @@ import type {
   AgentLaunchSettings,
   AgentLaunchSettingsMutation
 } from '../../../../shared/agent-launch-settings'
-import type { AgentProfileDescriptor } from '../../../../shared/agent-launch-profile'
-import { toAgentProfileSummary } from '../../../../shared/agent-launch-profile'
+import type {
+  AgentProfileDescriptor,
+  AgentProfileSummary
+} from '../../../../shared/agent-launch-profile'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { translate } from '@/i18n/i18n'
@@ -56,7 +58,6 @@ export function AgentProfileSection({
       ) : (
         <ul className="mt-3 space-y-2">
           {profiles.map((profile) => {
-            const summary = toAgentProfileSummary(profile)
             return (
               <li
                 key={profile.id}
@@ -67,7 +68,7 @@ export function AgentProfileSection({
                   <p className="truncate text-xs text-muted-foreground">
                     {profile.command} {profile.args}
                     {profile.baseProvider ? ` · ${profile.baseProvider}` : ''}
-                    {summary.envNames.length > 0 ? ` · ${summary.envNames.length} env` : ''}
+                    {profile.envNames.length > 0 ? ` · ${profile.envNames.length} env` : ''}
                     {!profile.enabled
                       ? ` · ${translate('settings.agents.profileDisabled', 'disabled')}`
                       : ''}
@@ -86,11 +87,20 @@ export function AgentProfileSection({
                   variant="ghost"
                   size="xs"
                   onClick={() => {
+                    // Duplicate carries no secrets: env values stay in the sealed recipe.
+                    // The new profile starts with an empty env; edit it via CLI for now.
                     const copy: AgentProfileDescriptor = {
-                      ...profile,
                       id: `${profile.id}-copy`,
                       label: `${profile.label} (copy)`,
-                      revisionId: `rev-${Date.now().toString(36)}`
+                      ownerHostId: '',
+                      baseProvider: profile.baseProvider,
+                      enabled: true,
+                      revisionId: `rev-${Date.now().toString(36)}`,
+                      command: profile.command,
+                      args: profile.args,
+                      envSet: {},
+                      envUnset: [],
+                      promptPolicy: profile.promptPolicy
                     }
                     void save({ type: 'profile-create', profile: copy })
                   }}
@@ -119,13 +129,7 @@ export function AgentProfileSection({
         <AgentProfileEditor
           initial={editingId === 'new' ? null : (settings.agentProfiles?.[editingId] ?? null)}
           onCancel={() => setEditingId(null)}
-          onSave={(profile) =>
-            save(
-              editingId === 'new'
-                ? { type: 'profile-create', profile }
-                : { type: 'profile-update', id: editingId, patch: profile }
-            )
-          }
+          onSave={(profile) => save({ type: 'profile-create', profile })}
         />
       ) : null}
       {confirmingDelete !== null ? (
@@ -174,7 +178,7 @@ function AgentProfileEditor({
   onCancel,
   onSave
 }: {
-  initial: AgentProfileDescriptor | null
+  initial: AgentProfileSummary | null
   onCancel: () => void
   onSave: (profile: AgentProfileDescriptor) => Promise<void>
 }): React.JSX.Element {
@@ -205,8 +209,8 @@ function AgentProfileEditor({
       revisionId: initial?.revisionId ?? `rev-${Date.now().toString(36)}`,
       command: command.trim(),
       args,
-      envSet: initial?.envSet ?? {},
-      envUnset: initial?.envUnset ?? [],
+      envSet: {},
+      envUnset: [],
       promptPolicy: initial?.promptPolicy ?? 'argv'
     }
     void onSave(initial ? { ...payload, id: initial.id } : payload)

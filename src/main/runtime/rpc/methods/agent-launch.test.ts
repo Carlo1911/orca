@@ -120,6 +120,17 @@ describe('who may call agent.launch', () => {
     await launch(CREATE_LAUNCH, runtime, {})
     expect(runtime.createManagedWorktree).toHaveBeenCalled()
   })
+  it('rejects a profiled launch from a client without the profiles capability', async () => {
+    const runtime = runtimeStub()
+    await expect(
+      launch({ ...CREATE_LAUNCH, profileId: 'work' }, runtime, {
+        clientKind: 'mobile',
+        pairedDeviceId: 'device-1',
+        clientCapabilities: [AGENT_LAUNCH_RUNTIME_CAPABILITY]
+      })
+    ).rejects.toThrow('agent_launch_profile_unsupported')
+    expect(runtime.createManagedWorktree).not.toHaveBeenCalled()
+  })
 })
 
 describe('what agent.launch accepts', () => {

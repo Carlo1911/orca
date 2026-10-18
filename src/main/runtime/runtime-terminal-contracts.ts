@@ -19,6 +19,7 @@ import type {
   RuntimeTerminalWaitCondition
 } from '../../shared/runtime-types'
 import type { TuiAgent } from '../../shared/tui-agent'
+import type { AgentLaunchIntent } from '../../shared/agent-launch-intent'
 import type { WorktreeStartupLaunch } from '../../shared/worktree/launch-types'
 import type { RuntimeTerminalSend } from '../../shared/runtime-terminal-contracts'
 import type { RuntimeTerminalWriteOptions } from './runtime-terminal-writer'
@@ -47,6 +48,8 @@ export type TerminalCreateOptions = {
   launchToken?: string
   launchAgent?: TuiAgent
   startupAgent?: TuiAgent
+  /** Fixed profile recipe (KTD3). The executor runs this, never the mutable definition. */
+  startupProfile?: AgentLaunchIntent['profileRecipe']
   /**
    * Initial text offered to `startupAgent`'s launch command, for an agent whose CLI takes a prompt
    * argument. Not a general prompt channel: an agent that takes its text only after start has no

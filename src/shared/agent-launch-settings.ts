@@ -1,6 +1,11 @@
 import type { GlobalSettings } from './global-settings-types'
 import type { TuiAgent } from './tui-agent'
-import { AgentProfileDescriptor, type AgentLaunchTarget } from './agent-launch-profile'
+import {
+  AgentProfileDescriptor,
+  toAgentProfileSummary,
+  type AgentLaunchTarget,
+  type AgentProfileSummary
+} from './agent-launch-profile'
 import { buildDefaultAgentSettingsUpdate } from './default-agent-settings'
 import {
   buildAgentAvailabilitySettingsUpdate,
@@ -34,7 +39,7 @@ export type AgentLaunchSettings = {
   agentCmdOverrides: NonNullable<GlobalSettings['agentCmdOverrides']>
   agentDefaultArgs: NonNullable<GlobalSettings['agentDefaultArgs']>
   environmentNames: Partial<Record<TuiAgent, string[]>>
-  agentProfiles: Record<string, AgentProfileDescriptor>
+  agentProfiles: Record<string, AgentProfileSummary>
   defaultAgentTarget: AgentLaunchTarget | 'blank' | null
   permissionMode: AgentPermissionMode
 }
@@ -67,7 +72,12 @@ export function projectAgentLaunchSettings(
         Object.keys(env ?? {}).sort()
       ])
     ),
-    agentProfiles: { ...settings.agentProfiles },
+    agentProfiles: Object.fromEntries(
+      Object.values(settings.agentProfiles ?? {}).map((profile) => [
+        profile.id,
+        toAgentProfileSummary(profile)
+      ])
+    ),
     defaultAgentTarget: settings.defaultAgentTarget ?? null,
     permissionMode: resolveAgentPermissionModeSummary(settings)
   }

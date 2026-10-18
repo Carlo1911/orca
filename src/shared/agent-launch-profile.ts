@@ -59,7 +59,7 @@ export const AgentProfileDescriptor = z
     envSet: z.record(z.string(), EnvValue),
     envUnset: z.array(EnvName),
     /** Prompt delivery: positional argv, a configured flag, or stdin-after-start. */
-    promptPolicy: z.enum(['argv', 'flag', 'stdin']),
+    promptPolicy: z.enum(['argv', 'flag', 'stdin-after-start']),
     /** Flag spelling used when `promptPolicy` is `flag`; absent otherwise. */
     promptFlag: z.string().max(64).optional()
   })

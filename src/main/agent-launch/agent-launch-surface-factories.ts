@@ -4,10 +4,9 @@
  * implements, not part of the sequencing it runs.
  */
 
-import type { AgentLaunchPrompt } from '../../shared/agent-launch-intent'
+import type { AgentLaunchIntent, AgentLaunchPrompt } from '../../shared/agent-launch-intent'
 import type { StructuredAgentId } from '../../shared/agent-session-provider-handle'
 import type { TuiAgent } from '../../shared/tui-agent'
-
 /** How a surface is built once the executor has decided which one. Injected because an
  *  orchestration worker's session carries a redrive subscription and a mailbox a plain launch
  *  must not take, while the decision and ordering above it are identical. */
@@ -41,9 +40,10 @@ export type AgentLaunchSurfaceFactory = {
     viewMode?: 'terminal' | 'chat'
     /** Account routing env merged over the agent's own (`agent.launch`'s `accountEnv`). */
     accountEnv?: Readonly<Record<string, string>>
+    /** Fixed profile recipe (KTD3); factory runs it, never the mutable definition. */
+    startupProfile?: AgentLaunchIntent['profileRecipe']
   }): Promise<{
     handle: string
-    /** The pane this create minted; a factory whose runtime reports none omits it, never invents. */
     paneKey?: string
     warning?: string
     /** Reported by the surface that built the typed line, never predicted by the executor. */

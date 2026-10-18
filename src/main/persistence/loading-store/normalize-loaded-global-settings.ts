@@ -18,6 +18,7 @@ import {
 import { readLegacySidekickFlag } from '../applying-settings/onboarding-normalization'
 import { normalizeMachineName } from '../../../shared/machine-name'
 import type { PersistedState } from '../../../shared/persisted-state-types'
+import { normalizeAgentProfiles } from '../../../shared/agent-launch-profile-normalize'
 import type { PreparedLoadedTerminalSettings } from './prepare-loaded-terminal-settings'
 import type { PreparedLoadedProfileSettings } from './prepare-loaded-profile-settings'
 
@@ -152,6 +153,7 @@ export function normalizeLoadedGlobalSettings(
       parsed.settings?.terminalShortcutPolicy
     ),
     disabledTuiAgents: migratedDisabledTuiAgents,
+    agentProfiles: normalizeAgentProfiles(parsed.settings?.agentProfiles),
     ...migratedAgentYoloDefaults,
     claudeAgentTeamsDefaultDisabledMigrated: true,
     sshRemoteCliControlExistingHostsMigrated: true,

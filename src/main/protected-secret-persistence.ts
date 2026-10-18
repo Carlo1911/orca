@@ -1,4 +1,4 @@
-import { getSecretStore } from '../shared/secret-store'
+import { getSecretStore, type SecretStore } from '../shared/secret-store'
 
 export const PROTECTED_SECRET_SLOT = {
   opencodeSessionCookie: 'settings.opencodeSessionCookie',
@@ -36,6 +36,11 @@ export class ProtectedSecretPersistence {
   private readonly sealedSlots = new Set<string>()
   private readonly pendingEncryption = new Set<string>()
   private readonly retentionEpochs = new Map<string, symbol>()
+  private readonly injectedStore: SecretStore | null
+
+  constructor(store?: SecretStore) {
+    this.injectedStore = store ?? null
+  }
 
   hasPendingEncryption(): boolean {
     return this.pendingEncryption.size > 0
@@ -45,7 +50,6 @@ export class ProtectedSecretPersistence {
     this.retentionEpochs.delete(slot)
     this.retainedBlobs.delete(slot)
     this.sealedSlots.delete(slot)
-    this.pendingEncryption.delete(slot)
   }
 
   /** Parks ciphertext without allowing an earlier pending write to replace it. */
@@ -113,7 +117,7 @@ export class ProtectedSecretPersistence {
       }
     }
     try {
-      const blob = getSecretStore().encryptString(plaintext).toString('base64')
+      const blob = this.resolveStore().encryptString(plaintext).toString('base64')
       return {
         blob,
         degraded: false,
@@ -147,7 +151,7 @@ export class ProtectedSecretPersistence {
     }
     try {
       const decrypted = {
-        plaintext: getSecretStore().decryptString(Buffer.from(ciphertext, 'base64')),
+        plaintext: this.resolveStore().decryptString(Buffer.from(ciphertext, 'base64')),
         status: 'decrypted' as const
       }
       this.sealedSlots.delete(slot)
@@ -175,12 +179,18 @@ export class ProtectedSecretPersistence {
     return { slot, blob, epoch }
   }
 
+  private resolveStore(): SecretStore {
+    // KTD4: an injected store lets the recipe instance share the host's backend
+    // without changing the global default. Absent injection, the global stands.
+    return this.injectedStore ?? getSecretStore()
+  }
+
   private encryptionAvailable(): boolean {
-    // Why getSecretStore() sits outside the try: an uninstalled store is a startup bug,
+    // Why resolveStore() sits outside the try: an uninstalled store is a startup bug,
     // not a keyring failure. Swallowing it would degrade to an empty blob and report
     // 'unavailable' — the silent-wrong-state outcome the port throws to prevent. Only
     // the backend probe itself may fail softly.
-    const store = getSecretStore()
+    const store = this.resolveStore()
     try {
       return store.isEncryptionAvailable()
     } catch (err) {

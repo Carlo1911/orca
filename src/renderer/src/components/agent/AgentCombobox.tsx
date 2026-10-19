@@ -24,6 +24,16 @@ import {
 } from './agent-combobox-items'
 import { translate } from '@/i18n/i18n'
 
+export type AgentComboboxValue = TuiAgent | { kind: 'profile'; profileId: string } | null
+
+export type AgentProfileListEntry = {
+  id: string
+  label: string
+  baseProvider: string | null
+  enabled: boolean
+  unavailable?: boolean
+}
+
 type DefaultAgentPreference = TuiAgent | 'blank' | null
 
 // Why: Blank Terminal is opt-in so agent-only flows (automations, source-control
@@ -35,6 +45,8 @@ type AgentComboboxSelectionProps =
 type AgentComboboxProps = AgentComboboxSelectionProps & {
   agents: AgentCatalogEntry[]
   value: TuiAgent | null
+  profiles?: readonly AgentProfileListEntry[]
+  onSelectProfile?: (profileId: string) => void
   onOpenManageAgents?: () => void
   /** Current saved default agent preference. Used to render a subtle "default"
    *  indicator in the list and to tell which right-click menu item is the
@@ -58,10 +70,13 @@ type AgentComboboxProps = AgentComboboxSelectionProps & {
 
 const BLANK_VALUE = '__none__'
 const TRIGGER_MIN_WIDTH_CLASS = '!min-w-[260px]'
+const EMPTY_PROFILES: readonly AgentProfileListEntry[] = []
 
 export default function AgentCombobox({
   agents,
   value,
+  profiles = EMPTY_PROFILES,
+  onSelectProfile,
   onOpenManageAgents,
   defaultAgent,
   onSetDefault,
@@ -349,6 +364,22 @@ export default function AgentCombobox({
                   label: agent.label
                 })
               )}
+              {onSelectProfile && profiles.length > 0
+                ? profiles.map((profile) =>
+                    renderAgentComboboxItem({
+                      key: `profile:${profile.id}`,
+                      itemValue: `profile:${profile.id}`,
+                      isChecked: false,
+                      isDefault: false,
+                      onSelect: () => {
+                        onSelectProfile(profile.id)
+                        closePicker()
+                      },
+                      icon: <Terminal className="size-3.5" />,
+                      label: profile.enabled ? profile.label : `${profile.label} (disabled)`
+                    })
+                  )
+                : null}
             </CommandList>
             {onOpenManageAgents ? (
               <div className="border-t border-border">

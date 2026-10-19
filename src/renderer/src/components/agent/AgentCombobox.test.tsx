@@ -226,4 +226,38 @@ describe('AgentCombobox', () => {
       expect(markup).not.toContain('https://www.google.com/s2/favicons')
     }
   })
+
+  it('lists saved profiles without hiding builtin agents', () => {
+    const onSelectProfile = vi.fn()
+    renderPicker(
+      <AgentCombobox
+        agents={AGENT_CATALOG}
+        value="claude"
+        onValueChange={vi.fn()}
+        profiles={[{ id: 'work', label: 'Claude Trabajo', baseProvider: 'claude', enabled: true }]}
+        onSelectProfile={onSelectProfile}
+      />
+    )
+    fireEvent.click(screen.getByRole('combobox'))
+    expect(screen.getByRole('option', { name: /claude trabajo/i })).toBeDefined()
+    expect(screen.getByRole('option', { name: /^claude$/i })).toBeDefined()
+  })
+
+  it('selecting a profile leaves the builtin value untouched', () => {
+    const onValueChange = vi.fn()
+    const onSelectProfile = vi.fn()
+    renderPicker(
+      <AgentCombobox
+        agents={AGENT_CATALOG}
+        value="claude"
+        onValueChange={onValueChange}
+        profiles={[{ id: 'work', label: 'Claude Trabajo', baseProvider: 'claude', enabled: true }]}
+        onSelectProfile={onSelectProfile}
+      />
+    )
+    fireEvent.click(screen.getByRole('combobox'))
+    fireEvent.click(screen.getByRole('option', { name: /claude trabajo/i }))
+    expect(onSelectProfile).toHaveBeenCalledWith('work')
+    expect(onValueChange).not.toHaveBeenCalled()
+  })
 })

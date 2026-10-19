@@ -85,7 +85,7 @@ export async function startLocalWorker(args: {
     )
   }
 
-  const { agent, launch } = prepareLocalWorkerStart({
+  const { agent, launch, profileRecipe } = prepareLocalWorkerStart({
     params: launchParams,
     createsWorktree,
     runtime,
@@ -189,6 +189,7 @@ export async function startLocalWorker(args: {
       resolvedWorktree,
       mode,
       agent,
+      profileRecipe,
       launchPreferences: launch.preferences,
       effects,
       onStage: (stage) => {

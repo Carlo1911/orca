@@ -8,7 +8,18 @@ import {
   pickMobileTuiAgent
 } from './mobile-tui-agents'
 
-export type WorkspaceAgentChoice = TuiAgent | 'blank'
+export type WorkspaceAgentChoice = TuiAgent | 'blank' | { kind: 'profile'; profileId: string }
+
+/** Opaque profile ref a client nuevo resuelve contra descriptores del host. Nunca se finge builtin. */
+export function normalizeWorkspaceProfile(
+  value: unknown
+): { kind: 'profile'; profileId: string } | null {
+  if (typeof value !== 'string' || !value.startsWith('profile:')) {
+    return null
+  }
+  const profileId = value.slice('profile:'.length)
+  return profileId.length > 0 ? { kind: 'profile', profileId } : null
+}
 
 type WorkspaceAgentSettings = {
   defaultTuiAgent?: TuiAgent | 'blank' | null
@@ -27,14 +38,20 @@ type ResolveWorkspaceAgentSelectionArgs = WorkspaceAgentSelectionState & {
 }
 
 export function workspaceAgentLabel(agent: WorkspaceAgentChoice): string {
-  return agent === 'blank' ? 'Blank Terminal' : MOBILE_TUI_AGENT_LABELS[agent]
+  if (agent === 'blank') {
+    return 'Blank Terminal'
+  }
+  if (typeof agent !== 'string') {
+    return agent.profileId
+  }
+  return MOBILE_TUI_AGENT_LABELS[agent]
 }
 
 export function normalizeWorkspaceAgent(value: unknown): WorkspaceAgentChoice | null {
   if (value === 'blank' || value === '__blank__') {
     return 'blank'
   }
-  return isMobileTuiAgent(value) ? value : null
+  return normalizeWorkspaceProfile(value) ?? (isMobileTuiAgent(value) ? value : null)
 }
 
 export function pickWorkspaceAgent(
@@ -42,8 +59,8 @@ export function pickWorkspaceAgent(
   detectedAgentIds: Set<string> | null
 ): WorkspaceAgentChoice {
   const preferred = normalizeWorkspaceAgent(settings.defaultTuiAgent)
-  if (preferred === 'blank') {
-    return preferred
+  if (preferred === 'blank' || (preferred !== null && typeof preferred !== 'string')) {
+    return preferred ?? 'blank'
   }
   const disabled = settings.disabledTuiAgents
   const enabledAutoPickOrder = filterEnabledMobileTuiAgents(
@@ -84,6 +101,10 @@ export function resolveWorkspaceAgentSelection({
     return agent === pickedAgent ? current : { agent: pickedAgent, overridden: false }
   }
 
+  if (typeof agent !== 'string') {
+    // Explicit profile pick stays visible; the host rejects at launch if gone.
+    return current
+  }
   if (
     detectedAgentIds === null ||
     !agent ||

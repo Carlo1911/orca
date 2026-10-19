@@ -18,6 +18,7 @@ import type { TuiAgent } from '../../../../../../shared/tui-agent'
 import { executeAgentLaunch } from '../../../../../agent-launch/agent-launch-executor'
 import type { AgentLaunchSurfaceFactory } from '../../../../../agent-launch/agent-launch-surface-factories'
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
+import type { ResolvedWorkerProfile } from './worker-start-validation'
 import type { OrchestrationDb } from '../../../../orchestration/db'
 import {
   WORKER_START_VOCABULARY,
@@ -62,6 +63,7 @@ type WorkerAgentPlacementArgs = {
   /** Decided before the dispatch record; for an existing worktree, already settled on its host. */
   mode: WorkerStartModeReceipt
   agent: TuiAgent | undefined
+  profileRecipe?: ResolvedWorkerProfile
   launchPreferences: AgentLaunchPreferences | undefined
   effects: WorkerEffect[]
   /** Attributes a throw to the step that was running, the way the caller's own stages do. */
@@ -114,6 +116,7 @@ async function launchWorkerAgent(
       runtime: args.runtime,
       intent: {
         agent,
+        ...(args.profileRecipe ? { profileRecipe: args.profileRecipe } : {}),
         // The worker's own factory builds the create from the dispatch, so the target carries none.
         target: existing
           ? { kind: 'existing', worktree: existing.id }

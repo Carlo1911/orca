@@ -92,6 +92,17 @@ describe('workspace agent selection', () => {
     ).toEqual({ agent: 'claude', overridden: false })
   })
 
+  it('keeps an explicit profile pick visible instead of faking a builtin', () => {
+    expect(
+      resolveWorkspaceAgentSelection({
+        selectionActive: true,
+        settings: { defaultTuiAgent: 'codex' },
+        detectedAgentIds: new Set(['claude']),
+        agent: { kind: 'profile', profileId: 'work' },
+        overridden: true
+      })
+    ).toEqual({ agent: { kind: 'profile', profileId: 'work' }, overridden: true })
+  })
   it('does not repair inactive selection state', () => {
     expect(
       resolveWorkspaceAgentSelection({

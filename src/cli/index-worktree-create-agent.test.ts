@@ -292,6 +292,47 @@ describe('orca cli worktree awareness', () => {
     process.exitCode = priorExitCode
   })
 
+  it('routes profile:<id> to agent.launch with profileId and never the legacy startup terminal', async () => {
+    queueFixtures(
+      callMock,
+      worktreeListFixture([buildWorktree('/tmp/repo', 'main', 'abc', 'repo-1')]),
+      agentLaunchHostFixture(),
+      agentLaunchFixture('repo-1::/tmp/repo/agent-task', 'The inferred parent contexts conflict.'),
+      okFixture('req_show', {
+        worktree: buildWorktree('/tmp/repo/agent-task', 'agent-task', 'abc', 'repo-1')
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'worktree',
+        'create',
+        '--repo',
+        'id:repo-1',
+        '--name',
+        'agent-task',
+        '--agent',
+        'profile:work',
+        '--prompt',
+        'hi',
+        '--json'
+      ],
+      '/tmp/repo/src'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(3, 'agent.launchReplay', {
+      target: expect.objectContaining({ kind: 'create-worktree' }),
+      presentation: 'background',
+      agent: expect.any(String),
+      profileId: 'work',
+      prompt: { text: 'hi', delivery: 'submit' },
+      launchSource: 'cli',
+      operationId: expect.any(String)
+    })
+    expect(callMock.mock.calls.some(([method]) => method === 'worktree.create')).toBe(false)
+  })
+
   it('rejects agent, prompt, and setup flags without values on worktree.create', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})

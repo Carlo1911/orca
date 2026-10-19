@@ -184,7 +184,7 @@ export function resolveResumeLaunchRecipe(
   }
   return {
     agentArgs: launchConfig.agentArgs,
-    agentEnv: launchConfig.agentEnv,
+    agentEnv: { ...launchConfig.agentEnv },
     ...(launchConfig.agentCommand ? { agentCommand: launchConfig.agentCommand } : {}),
     ...(launchConfig.ompResumeFilePath ? { ompResumeFilePath: launchConfig.ompResumeFilePath } : {})
   }

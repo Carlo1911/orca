@@ -32,9 +32,15 @@ import { wslTranscriptFsRefusal, type WslTranscriptFsError } from './wsl-transcr
 
 // Why: roots come from the shared table AI Vault discovery reads, computed per
 // call so they track the live home. An earlier root wins: that is what keeps one
-// account's transcript from resolving to another's.
-function claudeProjectsDirs(): string[] {
-  return uniqueDirs([...claudeProjectsHostDirs(), ...claudeProfileHistoryDirs('projects')])
+// account's transcript from resolving to another's. Callers may append pinned
+// profile roots via options; these defaults stay first for legacy sessions.
+function claudeProjectsDirs(extraProfileRoots: readonly string[] = []): string[] {
+  const pinned = extraProfileRoots.filter((dir) => dir.trim().length > 0)
+  return uniqueDirs([
+    ...claudeProjectsHostDirs(),
+    ...pinned,
+    ...claudeProfileHistoryDirs('projects')
+  ])
 }
 
 // Why: Orca launches Codex with its own managed CODEX_HOME, so Orca-started rollouts
@@ -67,19 +73,22 @@ export type ResolveSessionFileOptions = {
   strictErrors?: boolean
   /** Override the Claude projects root (used by tests / isolated scans). */
   claudeProjectsDir?: string
-  /** Override the Codex sessions roots, searched in order (tests / isolated
-   *  scans). Defaults to the orca-managed home then CODEX_HOME/~/.codex. */
+  /**
+   * Known profile roots for this host/runtime (KTD3): extra `projects` dirs a
+   * pinned launch recipe fixed. Listed after the explicit/default roots, so
+   * two profiles sharing one provider and workspace stay separate. An explicit
+   * `claudeProjectsDir` still admits no fallback: the caller named its tree.
+   */
+  claudeProfileProjectsDirs?: readonly string[]
+  /** Override the Codex sessions roots, searched in order (tests / isolated scans). */
   codexSessionsDirs?: string[]
   /** Override the Grok sessions root (`~/.grok/sessions`). */
   grokSessionsDir?: string
   /** Override the omp sessions root (`~/.omp/agent/sessions`). */
   ompSessionsDir?: string
-  /** Authoritative transcript path reported by the agent hook
-   *  (`providerSession.transcriptPath`). When set and the file exists, it is used
-   *  directly — recent Claude Code names the transcript with a UUID that differs
-   *  from the hook session_id, so the id-based glob below would miss it. */
+  /** Authoritative transcript path reported by the agent hook. */
   transcriptPath?: string
-  /** Attested WSL provider-session distro. Restricts exact-path resolution to that guest. */
+  /** Attested WSL provider-session distro. */
   wslDistro?: string
 }
 
@@ -177,8 +186,29 @@ async function resolveSessionFileById(
   // transcript, so overrides get no WSL tier.
   if (transcriptAgent === 'claude') {
     const override = options.claudeProjectsDir
-    return resolveTiered('claude', trimmedId, override ? [override] : claudeProjectsDirs(), {
-      wslTier: !override,
+    const profileRoots = (options.claudeProfileProjectsDirs ?? []).filter(
+      (dir) => dir.trim().length > 0 && dir !== override
+    )
+    // An explicit root is the caller naming the exact tree its session pinned:
+    // a miss there resolves in the pinned profile roots only, never by falling
+    // back to other accounts' default trees.
+    if (override) {
+      const hit = await resolveTiered('claude', trimmedId, [override], {
+        wslTier: false,
+        signal,
+        strictErrors: options.strictErrors
+      })
+      if (hit || profileRoots.length === 0) {
+        return hit
+      }
+      return resolveTiered('claude', trimmedId, profileRoots, {
+        wslTier: false,
+        signal,
+        strictErrors: options.strictErrors
+      })
+    }
+    return resolveTiered('claude', trimmedId, claudeProjectsDirs(profileRoots), {
+      wslTier: true,
       signal,
       strictErrors: options.strictErrors
     })
@@ -224,7 +254,12 @@ async function resolveTiered(
   agent: SessionIdLookupAgent,
   sessionId: string,
   hostDirs: readonly string[],
-  options: { wslTier: boolean; accountDirs?: () => readonly string[]; signal?: AbortSignal; strictErrors?: boolean }
+  options: {
+    wslTier: boolean
+    accountDirs?: () => readonly string[]
+    signal?: AbortSignal
+    strictErrors?: boolean
+  }
 ): Promise<string | null> {
   const { signal } = options
   const hit = await findFirstInDirs(agent, sessionId, hostDirs, signal, options.strictErrors)
@@ -232,7 +267,13 @@ async function resolveTiered(
     return hit
   }
   const accountDirs = (options.accountDirs?.() ?? []).filter((dir) => !hostDirs.includes(dir))
-  const accountHit = await findFirstInDirs(agent, sessionId, accountDirs, signal, options.strictErrors)
+  const accountHit = await findFirstInDirs(
+    agent,
+    sessionId,
+    accountDirs,
+    signal,
+    options.strictErrors
+  )
   if (accountHit || !options.wslTier) {
     return accountHit
   }

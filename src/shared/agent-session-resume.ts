@@ -54,6 +54,69 @@ export type SleepingAgentLaunchConfig = {
   ompResumeFilePath?: string
 }
 
+/**
+ * Safe profile metadata pinned at admission (KTD3): identifies the launch recipe
+ * the session fixed, never the sealed payload. `label` and `deleted` are display
+ * hints only; resume reads `profileId`/`revisionId` plus the captured launch
+ * recipe, so an edit, rename or delete never changes a prior session's identity.
+ */
+export type AgentProfileResumeRef = {
+  profileId: string
+  revisionId: string
+  /** Base provider for a derived profile; null for a generic CLI (KTD8: restart only). */
+  baseProvider: string | null
+  label?: string
+  deleted?: true
+}
+
+export function isPersistedProfileResumeRef(value: unknown): value is AgentProfileResumeRef {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const record = value as Record<string, unknown>
+  // Exact keys: a sealed payload (`envSet`/`command`) must never land here.
+  const keys = Object.keys(record)
+  if (
+    !keys.every((key) =>
+      ['profileId', 'revisionId', 'baseProvider', 'label', 'deleted'].includes(key)
+    )
+  ) {
+    return false
+  }
+  if (
+    typeof record.profileId !== 'string' ||
+    record.profileId.length === 0 ||
+    typeof record.revisionId !== 'string' ||
+    record.revisionId.length === 0
+  ) {
+    return false
+  }
+  if (typeof record.baseProvider !== 'string' && record.baseProvider !== null) {
+    return false
+  }
+  if (record.label !== undefined && typeof record.label !== 'string') {
+    return false
+  }
+  if (record.deleted !== undefined && record.deleted !== true) {
+    return false
+  }
+  return true
+}
+
+/**
+ * Restart argv for a generic profile: the fixed command plus args, then the prompt
+ * as argv (KTD8). Scrollback/history are preserved by the terminal; no transcript
+ * parser is invented here.
+ */
+export function buildGenericProfileRestartArgv(args: {
+  command: string
+  args: string
+  prompt: string
+}): string[] {
+  const argv = [args.command.trim(), args.args.trim(), args.prompt.trim()].filter(Boolean)
+  return argv.length > 0 ? argv : [args.command.trim()].filter(Boolean)
+}
+
 export type SleepingAgentSessionRecord = {
   paneKey: string
   tabId?: string
@@ -72,6 +135,8 @@ export type SleepingAgentSessionRecord = {
   mainAgent?: AgentMainAgentStatus
   connectionId?: string | null
   launchConfig?: SleepingAgentLaunchConfig
+  /** Pinned profile ref (KTD3): safe metadata, never the sealed recipe. */
+  profile?: AgentProfileResumeRef
   /** How the record was captured. Worktree-sleep records (legacy records have
    *  no origin) are consumed by worktree activation, which opens a fresh tab.
    *  Quit/live records describe panes that still exist in the restored session,

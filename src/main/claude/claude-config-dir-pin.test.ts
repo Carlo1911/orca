@@ -20,6 +20,14 @@ describe('claude config dir pin', () => {
     })
   })
 
+  it('keeps an equivalent re-spelling as a distinct literal identity', () => {
+    // A pinned recipe stores the root verbatim; normalizing `./` or a trailing
+    // separator away here would move a resumed session onto another identity.
+    expect(claudeConfigDirEnvPatch('/accounts/work/.claude/', { env: {} })).toEqual({
+      CLAUDE_CONFIG_DIR: '/accounts/work/.claude/'
+    })
+  })
+
   it('treats an inherited CLAUDE_CONFIG_DIR as the default the CLI already resolves', () => {
     const env = { CLAUDE_CONFIG_DIR: '/inherited/home' }
     expect(defaultClaudeConfigDir(env)).toBe('/inherited/home')

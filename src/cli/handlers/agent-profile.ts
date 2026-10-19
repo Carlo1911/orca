@@ -4,7 +4,7 @@ import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import type { RuntimeRpcSuccess } from '../runtime-client'
 import type { AgentLaunchSettings } from '../../shared/agent-launch-settings'
-import type { AgentProfileDescriptor } from '../../shared/agent-launch-profile'
+import type { AgentProfileSummary } from '../../shared/agent-launch-profile'
 
 function localSuccess<TResult>(result: TResult): RuntimeRpcSuccess<TResult> {
   return { id: 'local', ok: true as const, result, _meta: { runtimeId: 'local' } }
@@ -22,7 +22,7 @@ function readEnvSet(flags: Map<string, string | boolean>): Record<string, string
   return parsed
 }
 
-function formatProfileList(profiles: AgentProfileDescriptor[]): string {
+function formatProfileList(profiles: AgentProfileSummary[]): string {
   if (profiles.length === 0) {
     return 'No custom profiles.'
   }
@@ -31,7 +31,7 @@ function formatProfileList(profiles: AgentProfileDescriptor[]): string {
     .join('\n')
 }
 
-function formatProfileShow(profile: AgentProfileDescriptor | null): string {
+function formatProfileShow(profile: AgentProfileSummary | null): string {
   if (!profile) {
     return 'Profile not found.'
   }
@@ -40,7 +40,7 @@ function formatProfileShow(profile: AgentProfileDescriptor | null): string {
     `label: ${profile.label}`,
     `command: ${profile.command} ${profile.args}`.trim(),
     `base: ${profile.baseProvider ?? 'generic'}`,
-    `env: ${Object.keys(profile.envSet).join(', ') || '(none)'}`
+    `env: ${profile.envNames.join(', ') || '(none)'}`
   ].join('\n')
 }
 

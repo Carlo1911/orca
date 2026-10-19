@@ -32,6 +32,25 @@ describe('claude session roots', () => {
       )
     ).toEqual(['/scan/projects'])
   })
+
+  it('orders pinned profile roots after the default trees, verbatim', () => {
+    vi.stubEnv('CLAUDE_CONFIG_DIR', '/opt/claude-home')
+
+    expect(
+      AI_VAULT_AGENT_SOURCES.claude.rootDirs(
+        {
+          claudeProfileProjectsDirs: [],
+          profileProjectsDirs: ['/accounts/work/projects', '  ', '/accounts/work/projects/']
+        },
+        []
+      )
+    ).toEqual([
+      join('/opt/claude-home', 'projects'),
+      join(homedir(), '.claude', 'projects'),
+      '/accounts/work/projects',
+      '/accounts/work/projects/'
+    ])
+  })
 })
 
 describe('ompSessionsRootDirs', () => {

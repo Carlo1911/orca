@@ -26,8 +26,9 @@ import {
   resolveCurrentWorktreeSelector
 } from '../selectors'
 import type { HostScopedWorktreeSelection } from '../caller-host-worktree-selection'
-import type { TuiAgent } from '../../shared/tui-agent'
 import { parseCliAgent, readCliAgentLaunch } from '../agent-launch-request'
+import type { TuiAgent } from '../../shared/tui-agent'
+import { parseProfileSelector } from '../../shared/agent-launch-profile'
 import { createWorktreeWithAgent } from './worktree-create-agent-launch'
 import { printLineageSummary } from './worktree-lineage-summary'
 import { projectWorktreePsTerminalVerdict } from '../worktree-ps-terminal-verdict'
@@ -67,7 +68,11 @@ function getPresentStringFlag(
   throw new RuntimeClientError('invalid_argument', `Missing value for --${name}`)
 }
 
-function getOptionalStartupAgent(flags: Map<string, string | boolean>): TuiAgent | undefined {
+type StartupAgentSelection = TuiAgent | { kind: 'profile'; profileId: string }
+
+function getOptionalStartupAgent(
+  flags: Map<string, string | boolean>
+): StartupAgentSelection | undefined {
   const agent = getPresentStringFlag(flags, 'agent')
   if (agent === undefined) {
     const needsAgent = ['prompt', 'model', 'effort', 'retry-launch'].find((name) => flags.has(name))
@@ -75,6 +80,14 @@ function getOptionalStartupAgent(flags: Map<string, string | boolean>): TuiAgent
       throw new RuntimeClientError('invalid_argument', `--${needsAgent} requires --agent`)
     }
     return undefined
+  }
+  return getStartupAgentSelection(agent)
+}
+
+function getStartupAgentSelection(agent: string): StartupAgentSelection {
+  const profileId = parseProfileSelector(agent)
+  if (profileId !== null) {
+    return { kind: 'profile', profileId }
   }
   return parseCliAgent(agent)
 }

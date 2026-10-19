@@ -62,6 +62,14 @@ type AiVaultResumeStartupArgs = {
   host: AiVaultResumeHostShell
   settings: AiVaultResumeLaunchSettings | null | undefined
   commandOverride?: string | null
+  /**
+   * Pinned launch recipe fixed at admission (KTD3): replaces live
+   * command/args/env settings for this resume, so an edited or deleted
+   * definition never changes the session's root, flags or account.
+   */
+  profileRecipe?: SleepingAgentLaunchConfig
+  /** Base provider of the pinned profile; null (generic) refuses native resume (KTD8). */
+  profileBaseProvider?: string | null
 }
 
 export function getAiVaultResumeCodexHome(
@@ -136,7 +144,11 @@ export function buildAiVaultLocalResumeStartup(
         args.agentArgs ?? resolveTuiAgentLaunchArgs(session.agent, settings?.agentDefaultArgs),
       agentEnv: resolveTuiAgentLaunchEnv(session.agent, settings?.agentDefaultEnv),
       resumeInLaunchCwd: true,
-      ...(session.agent === 'omp' && resumeFilePath ? { ompResumeFilePath: resumeFilePath } : {})
+      ...(session.agent === 'omp' && resumeFilePath ? { ompResumeFilePath: resumeFilePath } : {}),
+      ...(args.profileRecipe ? { profileRecipe: args.profileRecipe } : {}),
+      ...(args.profileBaseProvider !== undefined
+        ? { profileBaseProvider: args.profileBaseProvider }
+        : {})
     })
     if (startupPlan) {
       return {
@@ -220,7 +232,11 @@ export function buildAiVaultForkStartup(
     agentArgs: resolveTuiAgentLaunchArgs(session.agent, settings?.agentDefaultArgs),
     agentEnv: resolveTuiAgentLaunchEnv(session.agent, settings?.agentDefaultEnv),
     resumeInLaunchCwd: true,
-    fork: true
+    fork: true,
+    ...(args.profileRecipe ? { profileRecipe: args.profileRecipe } : {}),
+    ...(args.profileBaseProvider !== undefined
+      ? { profileBaseProvider: args.profileBaseProvider }
+      : {})
   })
   if (!plan) {
     return null

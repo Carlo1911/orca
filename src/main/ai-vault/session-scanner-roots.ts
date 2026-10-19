@@ -51,12 +51,29 @@ export function claudeProjectsRootDirs(args: {
   wslHomeDirs?: readonly string[]
   /** Passed in by a scan worker, which has no account router of its own. */
   claudeProfileProjectsDirs?: readonly string[]
+  /**
+   * Known profile roots for this host/runtime: extra `projects` dirs pinned by
+   * launch profiles (KTD3). Ordered after the caller's explicit root, so two
+   * profiles sharing one provider and workspace keep their results separate and
+   * an explicit root still admits no fallback.
+   */
+  profileProjectsDirs?: readonly string[]
 }): string[] {
   return uniqueDirs([
     ...(args.claudeProjectsDir ? [args.claudeProjectsDir] : claudeProjectsHostDirs()),
+    ...normalizeProfileRootDirs(args.profileProjectsDirs),
     ...wslHomeSessionDirs('claude', args.wslHomeDirs ?? []),
     ...(args.claudeProfileProjectsDirs ?? claudeProfileHistoryDirs('projects'))
   ])
+}
+
+/**
+ * Profile-pinned session roots, verbatim: a re-spelled equivalent root must not
+ * change the pinned literal identity downstream (KTD3), so no normalization
+ * beyond trimming empties happens here.
+ */
+export function normalizeProfileRootDirs(dirs: readonly string[] | undefined): string[] {
+  return (dirs ?? []).filter((dir) => dir.trim().length > 0)
 }
 
 /** Each WSL home's session roots for one agent, in table order. */

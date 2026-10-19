@@ -139,6 +139,18 @@ export type AiVaultSession = {
   subagentTranscriptCount: number
   resumeCommand: string
   subagent: AiVaultSessionSubagentInfo | null
+  /**
+   * Pinned launch-profile reference fixed at admission (KTD3): safe metadata,
+   * never the sealed recipe. Lets history still name a renamed or deleted
+   * definition; a null base provider means restart, not native resume (KTD8).
+   */
+  profile?: {
+    profileId: string
+    revisionId: string
+    baseProvider: string | null
+    label?: string
+    deleted?: true
+  }
   /** Present only when the negotiated client can open the native structured owner. */
   structuredSession?: {
     sessionId: string

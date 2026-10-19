@@ -42,6 +42,23 @@ export type AgentStatusPtyRunRecord = {
   continuityOf?: AgentStatusRunId
   role: AgentStatusRunRole
   verdict: AgentStatusRunVerdict
+  /**
+   * Pinned launch-profile reference fixed at admission (KTD3): safe metadata,
+   * never the sealed recipe. Survives a renamed or deleted definition.
+   */
+  profile?: AgentStatusProfileRef
+}
+
+/**
+ * Pinned launch-profile reference fixed at admission (KTD3): safe metadata,
+ * never the sealed recipe. Survives a renamed or deleted definition.
+ */
+export type AgentStatusProfileRef = {
+  profileId: string
+  revisionId: string
+  baseProvider: string | null
+  label?: string
+  deleted?: true
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -154,13 +171,42 @@ function parseProviderSessions(value: unknown): AgentStatusProviderSession[] | n
   return sessions
 }
 
+function parseProfileRef(value: unknown): { ok: boolean; ref?: AgentStatusProfileRef } {
+  if (value === undefined) {
+    return { ok: true }
+  }
+  if (!isRecord(value)) {
+    return { ok: false }
+  }
+  if (
+    !hasExactKeys(value, ['profileId', 'revisionId', 'baseProvider'], ['label', 'deleted']) ||
+    !isBoundedIdentity(String(value.profileId ?? ''), MAX_RUN_ID_LENGTH) ||
+    typeof value.profileId !== 'string' ||
+    typeof value.revisionId !== 'string' ||
+    !isBoundedIdentity(value.revisionId, MAX_RUN_ID_LENGTH) ||
+    (typeof value.baseProvider !== 'string' && value.baseProvider !== null) ||
+    (value.label !== undefined && typeof value.label !== 'string') ||
+    (value.deleted !== undefined && value.deleted !== true)
+  ) {
+    return { ok: false }
+  }
+  return {
+    ok: true,
+    ref: {
+      profileId: value.profileId as string,
+      revisionId: value.revisionId as string,
+      baseProvider: value.baseProvider as string | null
+    }
+  }
+}
+
 export function parseAgentStatusPtyRunRecord(value: unknown): AgentStatusPtyRunRecord | null {
   if (
     !isRecord(value) ||
     !hasExactKeys(
       value,
       ['runId', 'paneKey', 'attachment', 'attribution', 'providerSessions', 'role', 'verdict'],
-      ['continuityOf']
+      ['continuityOf', 'profile']
     ) ||
     !isAgentStatusRunId(value.runId) ||
     !isBoundedIdentity(value.paneKey, MAX_PANE_KEY_LENGTH) ||
@@ -173,9 +219,11 @@ export function parseAgentStatusPtyRunRecord(value: unknown): AgentStatusPtyRunR
   const attachment = parseExecutionAttachment(value.attachment)
   const providerSessions = parseProviderSessions(value.providerSessions)
   const hasContinuity = Object.hasOwn(value, 'continuityOf')
+  const profile = parseProfileRef(value.profile)
   if (
     !attachment ||
     !providerSessions ||
+    !profile.ok ||
     (hasContinuity &&
       (!isAgentStatusRunId(value.continuityOf) || value.continuityOf === value.runId))
   ) {
@@ -190,6 +238,7 @@ export function parseAgentStatusPtyRunRecord(value: unknown): AgentStatusPtyRunR
     ...(hasContinuity && isAgentStatusRunId(value.continuityOf)
       ? { continuityOf: value.continuityOf }
       : {}),
+    ...(profile.ref ? { profile: profile.ref } : {}),
     role: value.role,
     verdict: value.verdict
   }

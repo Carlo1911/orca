@@ -16,6 +16,8 @@ export type AiVaultScanOptions = {
   claudeProjectsDir?: string
   /** Account `projects` folders the System default does not link; resolved by the host process. */
   claudeProfileProjectsDirs?: readonly string[]
+  /** Known profile roots for this host/runtime: extra trees a pinned recipe fixed (KTD3). */
+  profileProjectsDirs?: readonly string[]
   codebuddyProjectsDir?: string
   qoderProjectsDir?: string
   codexSessionsDir?: string

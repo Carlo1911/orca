@@ -8,16 +8,18 @@ import { randomUUID } from 'node:crypto'
 import type { AgentLaunchPrompt, AgentLaunchResult } from '../shared/agent-launch-intent'
 import { checkAgentLaunchModelPreferences } from '../shared/agent-launch-model-preferences'
 import {
-  AGENT_LAUNCH_RUNTIME_CAPABILITY,
-  AGENT_LAUNCH_PROMPT_CARRY_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_LOCAL_PRESENTATION_RUNTIME_CAPABILITY,
-  AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY
+  AGENT_LAUNCH_PROFILES_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_PROMPT_CARRY_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_RUNTIME_CAPABILITY
 } from '../shared/agent-launch-runtime-capability'
 import { createStructuredAgentSessionOperationId } from '../shared/structured-agent-session-mutation'
 import { parseAgentSessionOperationTimestamp } from '../shared/agent-session-host-authority'
 import type { RuntimeStatus } from '../shared/runtime-types'
-import type { TuiAgent } from '../shared/tui-agent'
+import { parseProfileSelector } from '../shared/agent-launch-profile'
 import { isTuiAgent } from '../shared/tui-agent-config'
+import type { TuiAgent } from '../shared/tui-agent'
 import {
   getOptionalStringFlag,
   getRequiredStringFlagAllowingEmpty,
@@ -33,12 +35,21 @@ export type CliAgentLaunchTarget =
   | { kind: 'existing'; worktree: string }
   | { kind: 'create-worktree'; create: Record<string, unknown> }
 
-export type CliAgentLaunch = {
-  agent: TuiAgent
-  prompt?: AgentLaunchPrompt
-  sessionOptions?: Record<string, string>
-  operationId?: string
-}
+export type CliAgentLaunch =
+  | {
+      kind: 'builtin'
+      agent: TuiAgent
+      prompt?: AgentLaunchPrompt
+      sessionOptions?: Record<string, string>
+      operationId?: string
+    }
+  | {
+      kind: 'profile'
+      profileId: string
+      prompt?: AgentLaunchPrompt
+      sessionOptions?: Record<string, string>
+      operationId?: string
+    }
 
 export function parseCliAgent(value: string): TuiAgent {
   if (!isTuiAgent(value)) {
@@ -47,13 +58,56 @@ export function parseCliAgent(value: string): TuiAgent {
   return value
 }
 
+/**
+ * U5: accept `profile:<id>` in `--agent`/`--provider`; resolve to the KTD5
+ * target, never through `isTuiAgent`. A builtin keeps its legacy shape.
+ */
+export function parseCliAgentTarget(
+  value: string
+): { kind: 'builtin'; agent: TuiAgent } | { kind: 'profile'; profileId: string } {
+  const profileId = parseProfileSelector(value)
+  if (profileId !== null) {
+    return { kind: 'profile', profileId }
+  }
+  return { kind: 'builtin', agent: parseCliAgent(value) }
+}
+
 /** The agent, prompt, model and effort a CLI start asks for; refuses a model or effort the launch
  *  could not apply, by the same rule as `orchestration worker-start`. */
 export function readCliAgentLaunch(
   flags: Flags,
-  agent: TuiAgent,
+  selection:
+    | TuiAgent
+    | { kind: 'builtin'; agent: TuiAgent }
+    | { kind: 'profile'; profileId: string },
   target: { createsWorktree: boolean }
 ): CliAgentLaunch {
+  if (typeof selection === 'object' && selection.kind === 'profile') {
+    const profileId = selection.profileId
+    if (hasLaunchModelFlags(flags)) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        'Profiles carry their own model configuration; omit --model and --effort.'
+      )
+    }
+    const prompt = flags.get('prompt')
+    rejectValuelessFlag(prompt, 'prompt')
+    const operationId = flags.has('retry-launch')
+      ? getRequiredStringFlagAllowingEmpty(flags, 'retry-launch')
+      : undefined
+    if (operationId !== undefined && parseAgentSessionOperationTimestamp(operationId) === null) {
+      throw new RuntimeClientError('invalid_argument', 'Malformed --retry-launch operation ID')
+    }
+    return {
+      kind: 'profile',
+      profileId,
+      ...(operationId ? { operationId } : {}),
+      ...(typeof prompt === 'string' && prompt.trim()
+        ? { prompt: { text: prompt, delivery: 'submit' as const } }
+        : {})
+    }
+  }
+  const agent: TuiAgent = typeof selection === 'string' ? selection : selection.agent
   const checked = checkAgentLaunchModelPreferences({
     agent,
     model: getOptionalStringFlag(flags, 'model'),
@@ -74,8 +128,8 @@ export function readCliAgentLaunch(
     throw new RuntimeClientError('invalid_argument', 'Malformed --retry-launch operation ID')
   }
   return {
+    kind: 'builtin',
     agent,
-    ...(operationId ? { operationId } : {}),
     // A blank prompt is no prompt: the agent starts with nothing sent.
     ...(typeof prompt === 'string' && prompt.trim()
       ? { prompt: { text: prompt, delivery: 'submit' as const } }
@@ -104,6 +158,15 @@ export async function callAgentLaunch(
   rawArgs?: readonly string[]
 ): Promise<RuntimeRpcSuccess<AgentLaunchResult & { operationId?: string }>> {
   const replaySupported = capabilities.includes(AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY)
+  if (
+    launch.kind === 'profile' &&
+    !capabilities.includes(AGENT_LAUNCH_PROFILES_RUNTIME_CAPABILITY)
+  ) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      'This Orca host cannot launch agent profiles. Update Orca on the execution host, or choose a built-in agent.'
+    )
+  }
   if (launch.operationId && !replaySupported) {
     throw new RuntimeClientError(
       'agent_session_operation_unknown',
@@ -127,7 +190,11 @@ export async function callAgentLaunch(
     : undefined
   const params = {
     ...request,
-    ...launch,
+    ...(launch.kind === 'profile'
+      ? { agent: 'claude' as TuiAgent, profileId: launch.profileId }
+      : { agent: launch.agent }),
+    ...(launch.prompt ? { prompt: launch.prompt } : {}),
+    ...(launch.sessionOptions ? { sessionOptions: launch.sessionOptions } : {}),
     ...(operationId ? { operationId } : {}),
     launchSource: 'cli'
   }

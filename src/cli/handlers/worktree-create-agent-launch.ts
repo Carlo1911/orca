@@ -43,10 +43,19 @@ export async function createWorktreeWithAgent(args: {
 }): Promise<void> {
   const { client, flags, create, launch, json, rawArgs } = args
   const capabilities = await getAgentLaunchCapabilities(client)
-  if (
+  // U5: the `worktree.create` legacy fallback stays for builtin selections
+  // without a profile. A profile target never degrades to startupAgent/base.
+  const isProfileLaunch = launch.kind === 'profile'
+  const canFallbackLegacy =
     !capabilities?.includes(AGENT_LAUNCH_LOCAL_PRESENTATION_RUNTIME_CAPABILITY) ||
     (launch.prompt && !capabilities.includes(AGENT_LAUNCH_PROMPT_CARRY_RUNTIME_CAPABILITY))
-  ) {
+  if (isProfileLaunch && canFallbackLegacy) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      'This Orca host cannot launch agent profiles. Update Orca on the execution host.'
+    )
+  }
+  if (canFallbackLegacy && launch.kind === 'builtin') {
     if (launch.operationId) {
       throw new RuntimeClientError(
         'agent_session_operation_unknown',
@@ -78,6 +87,12 @@ export async function createWorktreeWithAgent(args: {
     printLineageSummary(created.result, json)
     printResult(created, json, formatWorktreeShow)
     return
+  }
+  if (!capabilities) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      'This Orca host cannot start agents from the CLI. Update Orca on the execution host.'
+    )
   }
   const launched = await withSetupDecisionRecovery(
     callAgentLaunch(

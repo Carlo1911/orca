@@ -1,12 +1,5 @@
-import { isAgentSessionRewindRecord, type AgentSessionRewindRecord } from './agent-session-rewind'
-import { isAgentSessionLaunchArgs } from './agent-session-launch-args'
-import { isAgentSessionConversationName } from './agent-session-conversation-name'
-import {
-  isPersistedAgentSessionHandoffStage,
-  isPersistedAgentSessionRuntimeKind,
-  type PersistedAgentSessionLease,
-  type PersistedAgentSessionRecord
-} from './agent-session-legacy-handoff-lease'
+import type { AgentSessionRewindRecord } from './agent-session-rewind'
+import type { AgentSessionProfileRef } from './agent-session-profile-ref'
 /**
  * Durable agent-session record and its single-writer lease.
  *
@@ -16,24 +9,10 @@ import {
  */
 
 import type { ExecutionHostId } from './execution-host'
-import {
-  isAgentSessionConversationCommandRecord,
-  type AgentSessionConversationCommandRecord
-} from './agent-session-conversation-command'
-import {
-  decodePersistedAgentSessionProviderHandleChain,
-  type AgentSessionProviderHandleLink
-} from './agent-session-provider-handle'
-import {
-  isAgentSessionProviderContextBoundary,
-  type AgentSessionProviderContextBoundary
-} from './agent-session-provider-context'
-import { isStructuredAgentId } from './agent-session-provider-handle-encoding'
-import {
-  isAgentSessionAccountHome,
-  MAX_PATH_LENGTH,
-  type AgentSessionAccountHome
-} from './agent-session-account-home'
+import type { AgentSessionConversationCommandRecord } from './agent-session-conversation-command'
+import type { AgentSessionProviderHandleLink } from './agent-session-provider-handle'
+import type { AgentSessionProviderContextBoundary } from './agent-session-provider-context'
+import type { AgentSessionAccountHome } from './agent-session-account-home'
 
 export type { AgentSessionAccountHome } from './agent-session-account-home'
 
@@ -164,6 +143,8 @@ export type AgentSessionRecord = {
   /** The name Orca gave this conversation, so a later acquisition need not name it again. */
   conversationName?: string
   launchArgs?: AgentSessionLaunchArgs
+  /** Pinned launch-profile reference fixed at admission (KTD3); safe metadata only. */
+  profile?: AgentSessionProfileRef
   lease: AgentSessionLease
   createdAt: number
   updatedAt: number
@@ -177,14 +158,14 @@ export type AgentSessionOptionsReplacement = {
   now: number
 } & ({ options: Readonly<Record<string, string>> } | { permissionMode: string })
 
-const MAX_ID_LENGTH = 512
+export const MAX_ID_LENGTH = 512
 /** A death evidence's `detail` past this fails a load, so whoever writes one cuts it here. */
 export const MAX_AGENT_SESSION_DEATH_DETAIL_CHARS = MAX_ID_LENGTH
 const MAX_LAUNCH_ENV_ENTRIES = 256
 const MAX_LAUNCH_ENV_VALUE_LENGTH = 65_536
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/
 
-function isBoundedString(value: unknown, max: number): value is string {
+export function isBoundedString(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= max
 }
 
@@ -194,7 +175,6 @@ export function isAgentSessionId(value: unknown): value is string {
 
 /** NUL cannot occur in a host id, distro name, or workspace id, so no component can forge a join. */
 const SCOPE_KEY_SEPARATOR = '\u0000'
-
 /**
  * Scope key for host-and-workspace isolation. Native, WSL, and SSH copies of one workspace id are
  * different sessions; collapsing them would let one host adjudicate another host's lease.
@@ -279,123 +259,4 @@ export function isAgentSessionLaunchEnv(value: unknown): value is AgentSessionLa
   )
 }
 
-function isAgentSessionJournalCheckpoint(value: unknown): value is AgentSessionJournalCheckpoint {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-  const checkpoint = value as Partial<AgentSessionJournalCheckpoint>
-  return (
-    Number.isSafeInteger(checkpoint.epoch) &&
-    (checkpoint.epoch as number) >= 0 &&
-    Number.isSafeInteger(checkpoint.sequence) &&
-    (checkpoint.sequence as number) >= 0
-  )
-}
-
-function isAgentSessionDeathEvidence(value: unknown): value is AgentSessionDeathEvidence {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-  const evidence = value as Partial<AgentSessionDeathEvidence>
-  const { observedAt, lastProvenAliveAt, ownerFence, runtimeEnd } = evidence
-  return (
-    (evidence.kind === 'exit-observed' ||
-      evidence.kind === 'pid-absent' ||
-      evidence.kind === 'identity-mismatch') &&
-    isBoundedString(evidence.detail, MAX_AGENT_SESSION_DEATH_DETAIL_CHARS) &&
-    typeof observedAt === 'number' &&
-    Number.isSafeInteger(observedAt) &&
-    observedAt >= 0 &&
-    (ownerFence === undefined || (Number.isSafeInteger(ownerFence) && ownerFence >= 0)) &&
-    (lastProvenAliveAt === undefined ||
-      (Number.isSafeInteger(lastProvenAliveAt) &&
-        lastProvenAliveAt >= 0 &&
-        lastProvenAliveAt <= observedAt)) &&
-    (runtimeEnd === undefined || isBoundedString(runtimeEnd, MAX_ID_LENGTH))
-  )
-}
-
-function isPersistedAgentSessionLease(value: unknown): value is PersistedAgentSessionLease {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-  const lease = value as Partial<AgentSessionLease>
-  return (
-    isAgentSessionId(lease.sessionId) &&
-    isPersistedAgentSessionRuntimeKind(lease.runtimeKind) &&
-    Number.isSafeInteger(lease.runtimeFence) &&
-    (lease.runtimeFence as number) >= 0 &&
-    (lease.handoffStage === null || isPersistedAgentSessionHandoffStage(lease.handoffStage)) &&
-    (lease.provenHandleLinkId === null || isBoundedString(lease.provenHandleLinkId, 128)) &&
-    (lease.ownerProcess === null || isAgentSessionProcessIdentity(lease.ownerProcess)) &&
-    (lease.reservedSpawnToken === null ||
-      isBoundedString(lease.reservedSpawnToken, MAX_ID_LENGTH)) &&
-    Number.isSafeInteger(lease.leaseDeadlineAt) &&
-    Number.isSafeInteger(lease.lastRenewedAt) &&
-    (lease.handoffOperationId === null ||
-      isBoundedString(lease.handoffOperationId, MAX_ID_LENGTH)) &&
-    (lease.journalCheckpoint === null ||
-      isAgentSessionJournalCheckpoint(lease.journalCheckpoint)) &&
-    isBoundedString(lease.claimKeyId, MAX_ID_LENGTH) &&
-    (lease.claimStatus === 'reserved' ||
-      lease.claimStatus === 'live' ||
-      lease.claimStatus === 'conflicted' ||
-      lease.claimStatus === 'released') &&
-    typeof lease.unreconciled === 'boolean' &&
-    (lease.deathEvidence === null || isAgentSessionDeathEvidence(lease.deathEvidence))
-  )
-}
-
-/** Stored identity is independent of registrations; availability is checked only at start. */
-export function isPersistedAgentSessionRecord(
-  value: unknown
-): value is PersistedAgentSessionRecord {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-  const record = value as Partial<AgentSessionRecord>
-  const fieldsValid =
-    record.schemaVersion === AGENT_SESSION_RECORD_SCHEMA_VERSION &&
-    isAgentSessionId(record.sessionId) &&
-    isAgentSessionExecutionLocation(record.location) &&
-    isStructuredAgentId(record.provider) &&
-    isAgentSessionAccountHome(record.accountHome) &&
-    (record.launchDirectory === undefined ||
-      isBoundedString(record.launchDirectory, MAX_PATH_LENGTH)) &&
-    (record.options === undefined || isAgentSessionOptions(record.options)) &&
-    (record.permissionMode === undefined ||
-      isBoundedString(record.permissionMode, MAX_ID_LENGTH)) &&
-    (record.rewind === undefined || isAgentSessionRewindRecord(record.rewind)) &&
-    (record.providerContextBoundary === undefined ||
-      isAgentSessionProviderContextBoundary(record.providerContextBoundary)) &&
-    (record.conversationCommand === undefined ||
-      isAgentSessionConversationCommandRecord(record.conversationCommand)) &&
-    (record.conversationName === undefined ||
-      isAgentSessionConversationName(record.conversationName)) &&
-    (record.launchArgs === undefined || isAgentSessionLaunchArgs(record.launchArgs)) &&
-    !Object.hasOwn(record, 'launchEnv') &&
-    isPersistedAgentSessionLease(record.lease) &&
-    record.lease.sessionId === record.sessionId &&
-    Number.isSafeInteger(record.createdAt) &&
-    Number.isSafeInteger(record.updatedAt)
-  if (!fieldsValid) {
-    return false
-  }
-  const validated = record as AgentSessionRecord
-  // The row holds stored handles; validate the chain they decode to.
-  const chain = decodePersistedAgentSessionProviderHandleChain(validated.providerHandleChain)
-  const head = chain?.at(-1)
-  return (
-    chain !== null &&
-    // Chain validation already enforces one namespace.
-    (!head || head.handle.agent === validated.provider) &&
-    (validated.providerContextBoundary === undefined ||
-      validated.providerContextBoundary.afterFence <= validated.lease.runtimeFence) &&
-    (validated.lease.claimStatus !== 'live' ||
-      (validated.lease.ownerProcess !== null &&
-        // Null: the owner's process is live and its provider has not answered with a handle yet.
-        (validated.lease.provenHandleLinkId === null ||
-          (head?.linkId === validated.lease.provenHandleLinkId &&
-            head.mintedAtFence === validated.lease.runtimeFence))))
-  )
-}
+export { isPersistedAgentSessionRecord } from './agent-session-record-validation'

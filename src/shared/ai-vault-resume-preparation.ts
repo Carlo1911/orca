@@ -43,6 +43,14 @@ export type AiVaultPrepareSessionResumeResult = {
    *  (`agentForksThroughChat`): its id, and the agent whose CLI opens it, the chat's (an OpenCode
    *  2.x chat lists as `opencode2` but runs `opencode`). Absent from older hosts, which make none. */
   forkedSession?: AiVaultConversationCopy & { agent: AiVaultAgent }
+  /**
+   * The pinned recipe's env names are sealed and this caller is not authorized
+   * to sync env: resume is refused before spawn, never retried without the
+   * captured root/context. Absent when env materialized or the recipe needs none.
+   */
+  envUnavailable?: {
+    reason: 'env-sync-unauthorized' | 'recipe-inaccessible' | 'definition-deleted'
+  }
 }
 
 export type AiVaultSessionResumePreparation = (

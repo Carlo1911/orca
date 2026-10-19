@@ -163,6 +163,7 @@ function populate(loaded: LoadedWorkspaceLayout): LoadedWorkspaceLayout {
   sleeping('mainAgent', { state: 'done' })
   sleeping('connectionId', 'conn-1')
   sleeping('launchConfig', { agentArgs: '', agentEnv: {} })
+  sleeping('profile', { profileId: 'work', revisionId: 'rev-1', baseProvider: 'claude' })
   sleeping('restoreOnTabOpenOnly', true)
   fill(loaded, 'carried.unplacedSleepingRecords', {
     'tab-elsewhere:x': { paneKey: 'tab-elsewhere:x', worktreeId: 'repo-9::/gone', prompt: 'p' }

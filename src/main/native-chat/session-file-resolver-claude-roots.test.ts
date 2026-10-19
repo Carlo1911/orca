@@ -94,4 +94,30 @@ describe('claude transcript roots', () => {
 
     expect(scanned.dirs).toEqual(['/accounts/pinned/projects'])
   })
+
+  it('searches pinned profile roots without falling back to other accounts', async () => {
+    process.env.CLAUDE_CONFIG_DIR = CONFIG_DIR
+    await resolveSessionFilePath('claude', 'session-1', {
+      claudeProjectsDir: '/accounts/pinned/projects',
+      claudeProfileProjectsDirs: ['/accounts/work/projects']
+    })
+
+    expect(scanned.dirs).toEqual(['/accounts/pinned/projects', '/accounts/work/projects'])
+  })
+
+  it('keeps two profiles with one provider and workspace in separate roots', async () => {
+    process.env.CLAUDE_CONFIG_DIR = CONFIG_DIR
+    const work = join('/accounts/work/projects', '-repo', 'session-1.jsonl')
+    const personal = join('/accounts/personal/projects', '-repo', 'session-1.jsonl')
+    scanned.hits[join('/accounts/work/projects')] = work
+    scanned.hits[join('/accounts/personal/projects')] = personal
+
+    await expect(
+      resolveSessionFilePath('claude', 'session-1', {
+        claudeProfileProjectsDirs: ['/accounts/work/projects', '/accounts/personal/projects']
+      })
+    ).resolves.toBe(work)
+    // The second profile's tree is never consulted once the first pins the hit.
+    expect(scanned.dirs).toEqual([CONFIG_ROOT, DEFAULT_ROOT, '/accounts/work/projects'])
+  })
 })

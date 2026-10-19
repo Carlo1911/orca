@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   haveSameDisabledTuiAgents,
   normalizeDisabledTuiAgents,
-  pickTuiAgent
+  pickTuiAgent,
+  resolveDefaultAgentTarget
 } from './tui-agent-selection'
 
 describe('pickTuiAgent', () => {
@@ -40,5 +41,36 @@ describe('haveSameDisabledTuiAgents', () => {
     expect(haveSameDisabledTuiAgents(['codex', 'claude'], ['claude', 'codex'])).toBe(true)
     expect(haveSameDisabledTuiAgents(['codex', 'unknown'], ['codex'])).toBe(true)
     expect(haveSameDisabledTuiAgents(['codex'], ['claude'])).toBe(false)
+  })
+})
+
+describe('resolveDefaultAgentTarget', () => {
+  it('keeps a stored profile default across restarts while the builtin stays unset', () => {
+    expect(
+      resolveDefaultAgentTarget({
+        defaultTuiAgent: null,
+        defaultAgentTarget: { kind: 'profile', profileId: 'work' }
+      })
+    ).toEqual({ kind: 'profile', profileId: 'work' })
+  })
+
+  it('clears the profile default when its definition is disabled or gone', () => {
+    expect(
+      resolveDefaultAgentTarget({
+        defaultTuiAgent: null,
+        defaultAgentTarget: { kind: 'profile', profileId: 'work' },
+        isProfileUsable: () => false
+      })
+    ).toBeNull()
+  })
+
+  it('never invents a builtin fallback for a missing profile', () => {
+    expect(
+      resolveDefaultAgentTarget({
+        defaultTuiAgent: null,
+        defaultAgentTarget: { kind: 'profile', profileId: 'missing' },
+        isProfileUsable: () => false
+      })
+    ).toBeNull()
   })
 })

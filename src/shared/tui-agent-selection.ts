@@ -1,5 +1,6 @@
 import type { TuiAgent } from './tui-agent'
 import type { GlobalSettings } from './global-settings-types'
+import type { AgentLaunchTarget } from './agent-launch-profile'
 import { isTuiAgent } from './tui-agent-config'
 
 // Keep this order in sync with the desktop agent catalog. It defines the
@@ -124,4 +125,28 @@ export function filterEnabledTuiAgents<T extends TuiAgent>(
 ): T[] {
   const disabledSet = new Set(normalizeDisabledTuiAgents(disabled))
   return [...agents].filter((agent) => !disabledSet.has(agent))
+}
+
+/**
+ * U5: read the profile default from its own field. A profile default
+ * survives restarts next to an unset builtin; clearing happens when the
+ * profile is disabled or gone, and never invents a builtin fallback or
+ * stops active sessions.
+ */
+export function resolveDefaultAgentTarget(args: {
+  defaultTuiAgent?: TuiAgent | 'blank' | null
+  defaultAgentTarget?: AgentLaunchTarget | 'blank' | null
+  isProfileUsable?: (profileId: string) => boolean
+}): AgentLaunchTarget | 'blank' | null {
+  const stored = args.defaultAgentTarget ?? null
+  if (stored === null || stored === 'blank') {
+    return stored
+  }
+  if (stored.kind === 'builtin') {
+    return stored
+  }
+  if (args.isProfileUsable && !args.isProfileUsable(stored.profileId)) {
+    return null
+  }
+  return stored
 }

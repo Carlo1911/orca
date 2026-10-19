@@ -212,4 +212,72 @@ describe('automation session reuse', () => {
 
     expect(session).toBeNull()
   })
+
+  it('reuses only the same profile revision, never another profile or revision', () => {
+    const base = {
+      automationId: 'auto-1',
+      agentId: 'claude' as const,
+      worktreeId: 'wt-1',
+      currentRunId: 'run-current',
+      runs: [
+        run({
+          id: 'run-other-profile',
+          terminalSessionId: 'tab-1',
+          createdAt: 2,
+          profileRecipe: { profileId: 'other', revisionId: 'rev-9', baseProvider: 'claude' }
+        }),
+        run({
+          id: 'run-old-rev',
+          terminalSessionId: 'tab-1',
+          createdAt: 3,
+          profileRecipe: { profileId: 'work', revisionId: 'rev-1', baseProvider: 'claude' }
+        }),
+        run({
+          id: 'run-same',
+          terminalSessionId: 'tab-1',
+          createdAt: 4,
+          profileRecipe: { profileId: 'work', revisionId: 'rev-2', baseProvider: 'claude' }
+        })
+      ],
+      state: {
+        agentStatusByPaneKey: { [paneKey]: status() },
+        ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+        terminalLayoutsByTabId: { 'tab-1': { ptyIdsByLeafId: { [leafId]: 'pty-1' } } },
+        unifiedTabsByWorktree: {
+          'wt-1': [{ contentType: 'terminal', entityId: 'tab-1' }]
+        }
+      } as never
+    }
+    const session = findReusableAutomationSession({
+      ...base,
+      profileRecipe: { profileId: 'work', revisionId: 'rev-2' }
+    })
+    expect(session).toEqual({ tabId: 'tab-1', ptyId: 'pty-1', paneKey })
+  })
+
+  it('does not reuse a profiled session for a builtin launch', () => {
+    const session = findReusableAutomationSession({
+      automationId: 'auto-1',
+      agentId: 'claude',
+      worktreeId: 'wt-1',
+      currentRunId: 'run-current',
+      runs: [
+        run({
+          id: 'run-profiled',
+          terminalSessionId: 'tab-1',
+          createdAt: 2,
+          profileRecipe: { profileId: 'work', revisionId: 'rev-2', baseProvider: 'claude' }
+        })
+      ],
+      state: {
+        agentStatusByPaneKey: { [paneKey]: status() },
+        ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+        terminalLayoutsByTabId: { 'tab-1': { ptyIdsByLeafId: { [leafId]: 'pty-1' } } },
+        unifiedTabsByWorktree: {
+          'wt-1': [{ contentType: 'terminal', entityId: 'tab-1' }]
+        }
+      } as never
+    })
+    expect(session).toBeNull()
+  })
 })

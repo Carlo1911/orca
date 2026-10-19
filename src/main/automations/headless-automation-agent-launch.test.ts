@@ -219,4 +219,75 @@ describe('headless automation agent launch', () => {
     )
     expect(runtime.launchAgentTerminal).not.toHaveBeenCalled()
   })
+
+  it('resolves a derived profile and launches with the base agent', async () => {
+    const runtime = {
+      ...harness(),
+      getClientAgentLaunchSettings: () => ({
+        agentProfiles: {
+          work: {
+            id: 'work',
+            label: 'Claude Trabajo',
+            ownerHostId: 'h',
+            baseProvider: 'claude',
+            enabled: true,
+            revisionId: 'rev-2',
+            command: 'claude',
+            args: '',
+            envSet: {},
+            envUnset: [],
+            promptPolicy: 'argv'
+          }
+        }
+      })
+    }
+
+    const launched = await launch(runtime, { agentId: 'claude', profileId: 'work' })
+
+    expect(runtime.launchAgentTerminal).toHaveBeenCalledWith(
+      'id:wt-1',
+      expect.objectContaining({ agent: 'claude' })
+    )
+    expect(launched.terminalHandle).toBe('term_existing')
+  })
+
+  it('fails before effects for an unknown profile instead of falling back', async () => {
+    const runtime = {
+      ...harness(),
+      getClientAgentLaunchSettings: () => ({ agentProfiles: {} })
+    }
+
+    await expect(launch(runtime, { agentId: 'claude', profileId: 'missing' })).rejects.toThrow(
+      'agent_launch_profile_unavailable'
+    )
+    expect(runtime.launchAgentTerminal).not.toHaveBeenCalled()
+  })
+
+  it('refuses generic profiles for headless runs', async () => {
+    const runtime = {
+      ...harness(),
+      getClientAgentLaunchSettings: () => ({
+        agentProfiles: {
+          gen: {
+            id: 'gen',
+            label: 'Gen',
+            ownerHostId: 'h',
+            baseProvider: null,
+            enabled: true,
+            revisionId: 'rev-1',
+            command: '/bin/agent',
+            args: '',
+            envSet: {},
+            envUnset: [],
+            promptPolicy: 'stdin-after-start'
+          }
+        }
+      })
+    }
+
+    await expect(launch(runtime, { agentId: 'claude', profileId: 'gen' })).rejects.toThrow(
+      'agent_launch_profile_unsupported'
+    )
+    expect(runtime.launchAgentTerminal).not.toHaveBeenCalled()
+  })
 })

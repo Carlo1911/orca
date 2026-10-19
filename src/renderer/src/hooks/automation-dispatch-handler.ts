@@ -4,6 +4,7 @@ import { submitPromptToAgentPty } from '@/lib/agent-paste-draft'
 import { launchAgentBackgroundSession } from '@/lib/launch-agent-background-session'
 import { observeExistingAutomationSession } from '@/lib/automation-session-observer'
 import { findReusableAutomationSession } from '@/lib/automation-session-reuse'
+import { resolveDispatchProfileRecipe } from './automation-dispatch-profile'
 import type { AutomationTerminalOwnership } from '@/lib/automation-terminal-ownership'
 import { useAppStore } from '@/store'
 import type {
@@ -92,10 +93,52 @@ export async function handleAutomationDispatchRequest({
       finalizeTerminalOwnership
     })
     const dispatchStartedAt = Date.now()
+    // KTD2: resolve the profile when the owner claims the run, before effects.
+    // Unknown/disabled/unavailable profiles fail the run; never another target.
+    const claimedRecipe = await resolveDispatchProfileRecipe({
+      state,
+      worktreeId: worktree.id,
+      profileId: automation.profileId,
+      fail: (error) =>
+        markDispatchResult({
+          runId: run.id,
+          status: 'dispatch_failed',
+          workspaceId: worktree.id,
+          workspaceDisplayName: worktree.displayName,
+          error
+        })
+    })
+    if (claimedRecipe === null) {
+      return
+    }
+    const profileRecipe = claimedRecipe ?? undefined
+    if (
+      profileRecipe &&
+      automation.agentId !== profileRecipe.baseProvider &&
+      profileRecipe.baseProvider !== null
+    ) {
+      await markDispatchResult({
+        runId: run.id,
+        status: 'dispatch_failed',
+        workspaceId: worktree.id,
+        workspaceDisplayName: worktree.displayName,
+        error:
+          'agent_launch_profile_unsupported: profile base provider differs from the automation agent'
+      })
+      return
+    }
     if (automation.reuseSession) {
       const reusableSession = findReusableAutomationSession({
         automationId: automation.id,
         agentId: automation.agentId,
+        ...(profileRecipe
+          ? {
+              profileRecipe: {
+                profileId: profileRecipe.profileId,
+                revisionId: profileRecipe.revisionId
+              }
+            }
+          : {}),
         worktreeId: worktree.id,
         currentRunId: run.id,
         // Why: the dispatch loop only ever executes for the desktop authority,
@@ -167,6 +210,7 @@ export async function handleAutomationDispatchRequest({
     const result = await launchAgentBackgroundSession({
       agent: automation.agentId,
       worktreeId: worktree.id,
+      ...(profileRecipe ? { profileRecipe } : {}),
       prompt: automation.prompt,
       ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {}),
       launchSource: 'unknown',

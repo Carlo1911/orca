@@ -1,6 +1,7 @@
 import { useAppStore } from '@/store'
 import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
 import { buildAgentStartupPlan } from '@/lib/tui-agent-startup'
+import { buildGenericBackgroundStartupPlan } from './agent-background-generic-plan'
 import type {
   LaunchAgentBackgroundSessionArgs,
   LaunchAgentBackgroundSessionResult
@@ -42,6 +43,7 @@ export async function launchAgentBackgroundSession(
   args: LaunchAgentBackgroundSessionArgs
 ): Promise<LaunchAgentBackgroundSessionResult | null> {
   const { agent, worktreeId, prompt, launchSource, title, onData, onExit, onAgentStatus } = args
+  const profileRecipe = args.profileRecipe ?? null
   const store = useAppStore.getState()
   // Folder workspaces exist only in getKnownWorktreeById (#2989).
   const worktree = store.getKnownWorktreeById(worktreeId)
@@ -82,15 +84,29 @@ export async function launchAgentBackgroundSession(
   const hasPrompt = trimmedPrompt.length > 0
   const isFollowupPath = requireTuiAgentConfig(agent).promptInjectionMode === 'stdin-after-start'
 
-  const pasteDraftAfterLaunch = hasPrompt && isFollowupPath ? trimmedPrompt : null
-  const startupPlan = buildAgentStartupPlan({
-    ...planInputs,
-    prompt: hasPrompt && !isFollowupPath ? trimmedPrompt : '',
-    allowEmptyPromptLaunch: !hasPrompt || isFollowupPath
-  })
+  const { plan: genericStartupPlan, followup: genericFollowup } = buildGenericBackgroundStartupPlan(
+    {
+      agent,
+      profileRecipe,
+      prompt: trimmedPrompt,
+      launchPlatform,
+      hasPrompt,
+      isFollowupPath
+    }
+  )
+  const startupPlan =
+    genericStartupPlan ??
+    buildAgentStartupPlan({
+      ...planInputs,
+      prompt: hasPrompt && !isFollowupPath ? trimmedPrompt : '',
+      allowEmptyPromptLaunch: !hasPrompt || isFollowupPath
+    })
   if (!startupPlan) {
     return null
   }
+  // Generic stdin-after-start recipes deliver the prompt after spawn, like follow-up drafts.
+  const pasteDraftAfterLaunch =
+    genericFollowup ?? (hasPrompt && isFollowupPath ? trimmedPrompt : null)
 
   // A hidden run tab must never be store-visible without its PTY (#2989).
   const { reservedTabId, leafId, launchToken, launchRegistration, paneEnv } =

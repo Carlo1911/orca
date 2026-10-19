@@ -15,8 +15,11 @@ import type {
 } from '../agent-launch/agent-launch-execution'
 import { executeAgentLaunch } from '../agent-launch/agent-launch-executor'
 import type { Automation, AutomationRun } from '../../shared/automations-types'
-import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
+import type { AgentLaunchIntent } from '../../shared/agent-launch-intent'
+import { TUI_AGENT_CONFIG, isTuiAgent } from '../../shared/tui-agent-config'
+import type { TuiAgent } from '../../shared/tui-agent'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import { resolveProfileForLaunch } from '../runtime/rpc/methods/agent-launch-profile-resolution'
 import type { HeadlessAutomationDispatchLaunch } from './headless-dispatch'
 import { buildHeadlessAutomationWorktreeCreateArgs } from './headless-workspace-create'
 import type { AutomationRunTargetResult } from './run-target-resolution'
@@ -34,6 +37,40 @@ export type HeadlessAutomationAgentLaunch = Omit<HeadlessAutomationDispatchLaunc
   terminalHandle: string
 }
 
+/**
+ * Resolve the automation's profile (if any) when the owner claims the run.
+ * Unknown/disabled/unavailable profiles fail the run; never another target.
+ * Only derived profiles run workers here; generics need an interactive PTY policy.
+ */
+export function resolveHeadlessProfileRecipe(
+  runtime: OrcaRuntimeService,
+  automation: Automation
+): { baseAgent: TuiAgent; recipe: NonNullable<AgentLaunchIntent['profileRecipe']> } | null {
+  if (!automation.profileId) {
+    return null
+  }
+  const settings = runtime.getClientAgentLaunchSettings()
+  const resolved = resolveProfileForLaunch(automation.profileId, {
+    lookup: (id) => {
+      const descriptor = (settings.agentProfiles as Record<string, unknown>)[id]
+      if (!descriptor || typeof descriptor !== 'object') {
+        return null
+      }
+      return { profile: descriptor as never, available: true }
+    },
+    definitions: new Map(),
+    materialize: () => ({ ok: true })
+  })
+  if (!resolved.ok) {
+    throw new Error(`agent_launch_profile_unavailable: ${resolved.code}`)
+  }
+  if (resolved.recipe.baseProvider === null || !isTuiAgent(resolved.recipe.baseProvider)) {
+    throw new Error(
+      'agent_launch_profile_unsupported: generic profiles cannot run headless automations'
+    )
+  }
+  return { baseAgent: resolved.recipe.baseProvider, recipe: resolved.recipe }
+}
 export async function launchHeadlessAutomationAgent(
   runtime: OrcaRuntimeService,
   request: {
@@ -43,7 +80,10 @@ export async function launchHeadlessAutomationAgent(
   }
 ): Promise<HeadlessAutomationAgentLaunch> {
   const { automation, run, target } = request
-  const agent = automation.agentId
+  // KTD2: resolve the profile when the owner claims the run, before effects.
+  // Unknown/disabled/unavailable profiles fail the run; never another target.
+  const profileRecipe = resolveHeadlessProfileRecipe(runtime, automation)
+  const agent = profileRecipe?.baseAgent ?? automation.agentId
   // The startup plan trims the prompt for every agent; a blank one launches the agent bare.
   const text = automation.prompt?.trim()
   let workspace: { id: string; displayName: string | null } | undefined
@@ -52,6 +92,7 @@ export async function launchHeadlessAutomationAgent(
     runtime,
     intent: {
       agent,
+      ...(profileRecipe ? { profileRecipe: profileRecipe.recipe } : {}),
       // The workspace factory builds the create from the automation, so the target carries none.
       target:
         automation.workspaceMode === 'new_per_run'

@@ -1,12 +1,15 @@
 import type { ParsedAgentStatusPayload } from '../../../shared/agent-status-types'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import type { AgentLaunchIntent } from '../../../shared/agent-launch-intent'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import type { AutomationTerminalOwnership } from '@/lib/automation-terminal-ownership'
 
 export type LaunchAgentBackgroundSessionArgs = {
   agent: TuiAgent
   worktreeId: string
+  /** Fixed profile recipe (KTD3); when present the generic plan runs it. */
+  profileRecipe?: AgentLaunchIntent['profileRecipe']
   prompt?: string
   /** An automation's saved extras, merged over this host's default Arguments. */
   extraAgentArgs?: string

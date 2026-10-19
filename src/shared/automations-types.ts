@@ -160,6 +160,12 @@ export type AutomationRun = {
   outputSnapshot: AutomationRunOutputSnapshot | null
   precheckResult: AutomationPrecheckResult | null
   usage: AutomationRunUsage | null
+  /** Profile recipe fixed when the owner claimed the run (KTD3); safe metadata only. */
+  profileRecipe?: {
+    profileId: string
+    revisionId: string
+    baseProvider: string | null
+  } | null
   error: string | null
   startedAt: number | null
   dispatchedAt: number | null

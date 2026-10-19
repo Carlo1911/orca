@@ -15,6 +15,7 @@ export function findReusableAutomationSession(args: {
   agentId: TuiAgent
   worktreeId: string
   currentRunId: string
+  profileRecipe?: { profileId: string; revisionId: string } | null
   runs: AutomationRun[]
   state: Pick<
     AppState,
@@ -22,6 +23,7 @@ export function findReusableAutomationSession(args: {
   >
 }): ReusableAutomationSession | null {
   const { automationId, agentId, worktreeId, currentRunId, runs, state } = args
+  const profileRecipe = args.profileRecipe ?? null
   const worktreeTabs = state.unifiedTabsByWorktree[worktreeId] ?? []
   const terminalTabIds = new Set(
     worktreeTabs.filter((tab) => tab.contentType === 'terminal').map((tab) => tab.entityId)
@@ -34,7 +36,14 @@ export function findReusableAutomationSession(args: {
         run.workspaceId === worktreeId &&
         run.status === 'completed' &&
         Boolean(run.terminalPaneKey) &&
-        Boolean(run.terminalPtyId)
+        Boolean(run.terminalPtyId) &&
+        // Reuse only on identical target: same profile+revision, or same builtin
+        // agent when neither side names a profile. A live terminal of another
+        // profile or revision is never reused.
+        (profileRecipe
+          ? run.profileRecipe?.profileId === profileRecipe.profileId &&
+            run.profileRecipe?.revisionId === profileRecipe.revisionId
+          : !run.profileRecipe)
     )
     .sort((left, right) => right.createdAt - left.createdAt)
 

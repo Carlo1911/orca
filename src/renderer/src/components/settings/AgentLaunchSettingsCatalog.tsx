@@ -19,6 +19,10 @@ import { AgentDetectionCatalog } from './AgentDetectionCatalog'
 import type { AgentCatalogRowProps } from './AgentCatalogRow'
 import { HostAgentEnvironmentEditor } from './HostAgentEnvironmentEditor'
 import { buildCodexSessionSourceHomeControl } from './codex-session-source-home-control'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  toRuntimeExecutionHostId
+} from '../../../../shared/execution-host'
 import { AgentProfileSection } from './AgentProfileSection'
 import { translate } from '@/i18n/i18n'
 
@@ -127,7 +131,15 @@ export function AgentLaunchSettingsCatalog({
         onSetDefault={(agent) => save({ type: 'default', agent })}
       />
       {renderPermissions(settings.permissionMode, (mode) => save({ type: 'permissions', mode }))}
-      <AgentProfileSection settings={settings} mutate={mutate} />
+      <AgentProfileSection
+        settings={settings}
+        mutate={mutate}
+        ownerHostId={
+          detectionTarget.kind === 'runtime'
+            ? toRuntimeExecutionHostId(detectionTarget.environmentId)
+            : LOCAL_EXECUTION_HOST_ID
+        }
+      />
       <AgentDetectionCatalog
         detectedAgents={detectedAgents}
         undetectedAgents={undetectedAgents}

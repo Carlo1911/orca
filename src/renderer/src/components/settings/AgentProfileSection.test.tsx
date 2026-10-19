@@ -21,7 +21,7 @@ describe('AgentProfileSection', () => {
   it('creates a profile from the editor', async () => {
     const user = userEvent.setup()
     const mutate = vi.fn(async () => {})
-    render(<AgentProfileSection settings={BASE_SETTINGS} mutate={mutate} />)
+    render(<AgentProfileSection settings={BASE_SETTINGS} mutate={mutate} ownerHostId="local" />)
     await user.click(screen.getByRole('button', { name: /new profile/i }))
     await user.type(screen.getByLabelText(/name/i), 'Claude Trabajo')
     await user.type(screen.getByLabelText(/command/i), 'claude')
@@ -36,7 +36,7 @@ describe('AgentProfileSection', () => {
   it('requires name and command', async () => {
     const user = userEvent.setup()
     const mutate = vi.fn(async () => {})
-    render(<AgentProfileSection settings={BASE_SETTINGS} mutate={mutate} />)
+    render(<AgentProfileSection settings={BASE_SETTINGS} mutate={mutate} ownerHostId="local" />)
     await user.click(screen.getByRole('button', { name: /new profile/i }))
     await user.click(screen.getByRole('button', { name: /save profile/i }))
     expect(screen.getByRole('alert')).toBeDefined()
@@ -66,7 +66,7 @@ describe('AgentProfileSection', () => {
         }
       }
     } as unknown as AgentLaunchSettings
-    render(<AgentProfileSection settings={settings} mutate={mutate} />)
+    render(<AgentProfileSection settings={settings} mutate={mutate} ownerHostId="local" />)
     await user.click(screen.getByRole('button', { name: /^delete$/i }))
     expect(screen.getByRole('alertdialog')).toBeDefined()
     await user.click(screen.getAllByRole('button', { name: /^delete$/i })[1]!)

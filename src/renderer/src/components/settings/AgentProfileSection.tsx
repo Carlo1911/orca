@@ -13,10 +13,13 @@ import { translate } from '@/i18n/i18n'
 
 export function AgentProfileSection({
   settings,
-  mutate
+  mutate,
+  ownerHostId
 }: {
   settings: AgentLaunchSettings
   mutate: (mutation: AgentLaunchSettingsMutation) => Promise<void>
+  /** Execution host that owns profiles created here; preserved on edit. */
+  ownerHostId: string
 }): React.JSX.Element {
   const profiles = Object.values(settings.agentProfiles ?? {})
   const [editingId, setEditingId] = useState<string | 'new' | null>(null)
@@ -92,7 +95,7 @@ export function AgentProfileSection({
                     const copy: AgentProfileDescriptor = {
                       id: `${profile.id}-copy`,
                       label: `${profile.label} (copy)`,
-                      ownerHostId: '',
+                      ownerHostId,
                       baseProvider: profile.baseProvider,
                       enabled: true,
                       revisionId: `rev-${Date.now().toString(36)}`,
@@ -130,6 +133,7 @@ export function AgentProfileSection({
           initial={editingId === 'new' ? null : (settings.agentProfiles?.[editingId] ?? null)}
           onCancel={() => setEditingId(null)}
           onSave={(profile) => save({ type: 'profile-create', profile })}
+          ownerHostId={ownerHostId}
         />
       ) : null}
       {confirmingDelete !== null ? (
@@ -176,11 +180,13 @@ export function AgentProfileSection({
 function AgentProfileEditor({
   initial,
   onCancel,
-  onSave
+  onSave,
+  ownerHostId
 }: {
   initial: AgentProfileSummary | null
   onCancel: () => void
   onSave: (profile: AgentProfileDescriptor) => Promise<void>
+  ownerHostId: string
 }): React.JSX.Element {
   const [label, setLabel] = useState(initial?.label ?? '')
   const [command, setCommand] = useState(initial?.command ?? '')
@@ -203,7 +209,7 @@ function AgentProfileEditor({
     const payload: AgentProfileDescriptor = {
       id,
       label: label.trim(),
-      ownerHostId: initial?.ownerHostId ?? '',
+      ownerHostId: initial?.ownerHostId ?? ownerHostId,
       baseProvider: initial?.baseProvider ?? null,
       enabled: initial?.enabled ?? true,
       revisionId: initial?.revisionId ?? `rev-${Date.now().toString(36)}`,

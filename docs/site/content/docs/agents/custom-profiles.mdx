@@ -1,0 +1,34 @@
+---
+title: Custom agent profiles
+description: Launch entries with their own command, args, and environment.
+---
+
+Orca works with **any CLI agent**. Custom profiles are named launch entries with their own command, arguments, and environment. Two profiles may share one executable (for example, two Claude configs with different `CLAUDE_CONFIG_DIR` values). Pick them everywhere a built-in agent can be picked: the agent combobox, workers, mobile, and automations.
+
+## Create a profile
+
+**Settings → Agents → Custom profiles → New profile**, or from the terminal:
+
+```bash
+orca agent profile create --id claude-work --label "Claude Trabajo" --command claude --env-set CLAUDE_CONFIG_DIR=/work/.claude
+orca agent profile list
+orca agent profile show --id claude-work
+orca agent profile remove --id claude-work
+```
+
+A new profile needs a name and a command. Optional: arguments, a base provider (marks the entry as a variant of a known agent, which enables its status and hooks), environment entries, and the prompt delivery (`argv`, a `--flag`, or `stdin-after-start`).
+
+Environment values are secrets: they are sealed into the launch recipe and never appear in run records, history, or `profile show` — only variable names are listed.
+
+## Fixed recipe
+
+When a session starts, Orca pins the profile's current command, args, and environment onto the run. Sessions already running keep their recipe: editing or deleting the profile never changes them, and deleting a profile that running sessions reference is rejected until those sessions end.
+
+A launch fails explicitly — never silently falling back to another agent — when the profile is unknown, disabled, or the executable is not installed on the target host.
+
+## Where profiles work
+
+- **Agent picker and tab defaults** — profiles appear alongside built-ins.
+- **Workers and mobile** — the profile travels with the task; the worker resolves it against its own host and fails with a named error when it cannot.
+- **Automations** — a run pinned to a profile reuses only an idle session of the same profile and revision, never a terminal running something else.
+- **History and resume** — restart and follow-up keep the original profile recipe.

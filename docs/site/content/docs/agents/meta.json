@@ -3,6 +3,7 @@
   "defaultOpen": true,
   "pages": [
     "supported",
+    "custom-profiles",
     "claude-code",
     "glm-agent",
     "codex",

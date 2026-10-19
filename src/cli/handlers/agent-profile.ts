@@ -5,6 +5,7 @@ import { RuntimeClientError } from '../runtime-client'
 import type { RuntimeRpcSuccess } from '../runtime-client'
 import type { AgentLaunchSettings } from '../../shared/agent-launch-settings'
 import type { AgentProfileSummary } from '../../shared/agent-launch-profile'
+import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 
 function localSuccess<TResult>(result: TResult): RuntimeRpcSuccess<TResult> {
   return { id: 'local', ok: true as const, result, _meta: { runtimeId: 'local' } }
@@ -72,6 +73,8 @@ export const AGENT_PROFILE_HANDLERS: Record<string, CommandHandler> = {
     const command = getRequiredStringFlag(flags, 'command')
     const baseProvider = flags.get('base-provider')
     const args = flags.get('args')
+    const promptPolicy = flags.get('prompt-policy')
+    const promptFlag = flags.get('prompt-flag')
     const response = await client.call<{ settings: AgentLaunchSettings }>(
       'settings.mutateAgentLaunch',
       {
@@ -79,15 +82,23 @@ export const AGENT_PROFILE_HANDLERS: Record<string, CommandHandler> = {
         profile: {
           id,
           label,
-          ownerHostId: '',
+          ownerHostId: LOCAL_EXECUTION_HOST_ID,
           baseProvider: typeof baseProvider === 'string' ? baseProvider : null,
           enabled: true,
-          revisionId: 'rev-cli',
+          revisionId: `rev-cli-${Date.now().toString(36)}`,
           command,
           args: typeof args === 'string' ? args : '',
           envSet: readEnvSet(flags),
           envUnset: getRepeatedStringFlag(flags, 'env-unset'),
-          promptPolicy: 'argv'
+          promptPolicy:
+            promptPolicy === 'flag' ||
+            promptPolicy === 'stdin-after-start' ||
+            promptPolicy === 'stdin'
+              ? promptPolicy === 'stdin'
+                ? 'stdin-after-start'
+                : promptPolicy
+              : 'argv',
+          ...(typeof promptFlag === 'string' && promptFlag.length > 0 ? { promptFlag } : {})
         }
       }
     )

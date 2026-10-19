@@ -29,6 +29,7 @@ const SETTINGS = {
       args: '',
       envSet: { CLAUDE_CONFIG_DIR: '/work/.claude' },
       envUnset: [],
+      envNames: ['CLAUDE_CONFIG_DIR'],
       promptPolicy: 'argv'
     }
   }
